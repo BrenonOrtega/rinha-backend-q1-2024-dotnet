@@ -7,9 +7,11 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - ASPNETCORE_URLS=http://+:5000
       - ASPNETCORE_ENVIRONMENT=Production
-    network_mode: "host"
+    networks:
+      - rinha_backend
+    ports:
+      - "5000:8080"
     depends_on:
       - postgres
     deploy:
@@ -21,17 +23,17 @@ services:
   webapi2:
     <<: *api 
     hostname: webapi2
-    environment:
-      - ASPNETCORE_URLS=http://+:5001
-      - ASPNETCORE_ENVIRONMENT=Production
+    ports:
+      - "5001:8080"
 
   load-balancer:
     build:
       context: .
       dockerfile: Dockerfile.LoadBalancer
+    networks:
+      - rinha_backend
     ports:
-      - "9999"
-    network_mode: "host"
+      - "9999:9999"
     deploy:
       resources:
         limits:
@@ -44,9 +46,16 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    network_mode: "host"
+    networks:
+      - rinha_backend
+    ports:
+      - "5432:5432"
     deploy:
       resources:
         limits:
           cpus: "0.3"
           memory: "200MB"
+
+networks:
+  rinha_backend:
+    driver: bridge
