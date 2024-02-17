@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  webapi1: &api
+    hostname: webapi1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - ASPNETCORE_URLS=http://+:5000
+      - ASPNETCORE_ENVIRONMENT=Production
+    network_mode: "host"
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "170MB"
+
+  webapi2:
+    <<: *api 
+    hostname: webapi2
+    environment:
+      - ASPNETCORE_URLS=http://+:5001
+      - ASPNETCORE_ENVIRONMENT=Production
+
+  load-balancer:
+    build:
+      context: .
+      dockerfile: Dockerfile.LoadBalancer
+    ports:
+      - "9999"
+    network_mode: "host"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "30MB"
+
+  postgres:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    network_mode: "host"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: "200MB"

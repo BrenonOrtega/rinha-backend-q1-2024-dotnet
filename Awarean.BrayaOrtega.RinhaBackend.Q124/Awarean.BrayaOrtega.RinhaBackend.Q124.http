@@ -1,0 +1,6 @@
+@Awarean.BrayaOrtega.RinhaBackend.Q1._2024_HostAddress = http://localhost:5007
+
+GET {{Awarean.BrayaOrtega.RinhaBackend.Q1._2024_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
