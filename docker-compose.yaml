@@ -5,7 +5,7 @@ services:
     hostname: webapi1
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.Application
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
     networks:

@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\buildMultiTargeting\Awarean.BrayaOrtega.RinhaBackend.Q1.2024.props" />
-</Project>

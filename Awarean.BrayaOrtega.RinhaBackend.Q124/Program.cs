@@ -1,46 +1,58 @@
+using Awarean.BrayaOrtega.RinhaBackend.Q124;
+using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
+using Microsoft.AspNetCore.HttpLogging;
+using Microsoft.AspNetCore.Mvc;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddLogging();
+builder.Services.AddHttpLogging(x => { x.LoggingFields = HttpLoggingFields.All; });
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+app.MapGet("/", () => "Im working!")
+    .WithHttpLogging(HttpLoggingFields.All);
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
+app.MapGet("/clientes/{id:int}/extrato", 
+    (int id, [FromServices]Repository repo) =>
+    {
+        var account = repo.GetBankStatementAsync(id);
 
-app.MapGet("/", () => "Im working!");
+        if (account is not null)
+            return Results.Ok(account);
+
+        return Results.NotFound();
+    });
+
+app.MapPost("/clientes/{id:int}/transacoes", async (
+    int id, 
+    [FromBody]TransactionRequest transaction,
+    [FromServices] Repository repo) =>
+    {
+        var account = await repo.GetAccountByIdAsync(id);
+
+        if (account is null)
+            return Results.NotFound();
+
+        if (account.CanExecute(transaction) is false)
+            return Results.UnprocessableEntity();
+
+        account.Execute(transaction);
+        
+        await repo.SaveChanges();
+
+        return Results.Ok();
+    })
+    .WithHttpLogging(HttpLoggingFields.All);
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
