@@ -1,24 +1,18 @@
 using Awarean.BrayaOrtega.RinhaBackend.Q124;
+using Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateSlimBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 builder.Services.AddLogging();
 builder.Services.AddHttpLogging(x => { x.LoggingFields = HttpLoggingFields.All; });
+builder.Services.ConfigureInfrastructure(builder.Configuration.GetConnectionString("Postgres"));
 
 var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-app.UseSwagger();
-app.UseSwaggerUI();
-
-app.UseHttpsRedirection();
 
 app.MapGet("/", () => "Im working!")
     .WithHttpLogging(HttpLoggingFields.All);
