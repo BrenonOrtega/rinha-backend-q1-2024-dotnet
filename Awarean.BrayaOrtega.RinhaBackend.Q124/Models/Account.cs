@@ -1,16 +1,34 @@
-
-
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-public sealed class Account(int id, long limite, long saldo)
+public sealed class Account
 {
-    public int Id { get; private set; } = id;
+    public Account(long limite, long saldo)
+        : this(default, limite, saldo, [])
+    {
 
-    public long Limite { get; private set; } = limite;
+    }
 
-    public long Saldo { get; private set; } = saldo;
+    public Account(int id, long limite, long saldo)
+        : this(id, limite, saldo, [])
+    {
 
-    public List<Transaction> Transactions { get; private set; } = [];
+    }
+
+    public Account(int id, long limite, long saldo, List<Transaction> transactions)
+    {
+        Id = id;
+        Limite = limite;
+        Saldo = saldo;
+        Transactions = transactions ?? [];
+    }
+
+    public int Id { get; private set; }
+
+    public long Limite { get; private set; }
+
+    public long Saldo { get; private set; }
+
+    public List<Transaction> Transactions { get; private set; }
 
     public bool CanExecute(TransactionRequest transaction)
     {
@@ -28,8 +46,9 @@ public sealed class Account(int id, long limite, long saldo)
     public void Execute(TransactionRequest transaction)
     {
         long valor = transaction.Valor;
-        
-        _ = transaction.Tipo switch {
+
+        _ = transaction.Tipo switch
+        {
             "c" => Saldo += valor,
             "d" => Saldo -= valor,
             _ => throw new InvalidOperationException("Operacao nao permitida. As operacoes permitidas sao (c) Credito e (d) Debito.")
@@ -38,6 +57,6 @@ public sealed class Account(int id, long limite, long saldo)
         if (GetRemainingLimit() < 0)
             throw new InvalidOperationException();
 
-        Transactions.Add(new Transaction(valor, transaction.Tipo, transaction.Descricao, DateTime.Now));
+        Transactions.Add(new Transaction(valor, transaction.Tipo, transaction.Descricao, Id));
     }
 }

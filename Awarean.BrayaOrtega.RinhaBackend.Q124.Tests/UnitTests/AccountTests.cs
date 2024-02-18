@@ -1,20 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using FluentAssertions;
 
-namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests;
+namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.UnitTests;
 
-public class AccountTests
+public sealed class AccountTests
 {
     readonly TransactionRequest invalidTransaction = new (3, "d", "Debito que deixaria a conta com valor menor que o limite");
 
     [Fact]
     public void Shouldnt_Allow_invalid_Transaction()
     {
-        var account = new Account(1, 10000, -9998);
+        var account = new Account(1, 10000, -9998, []);
 
         account.CanExecute(invalidTransaction).Should().BeFalse();
     }
@@ -22,7 +18,7 @@ public class AccountTests
     [Fact]
     public void Executing_invalid_Transaction_Should_Throw()
     {
-        var account = new Account(1, 10000, -9998);
+        var account = new Account(1, 10000, -9998, []);
 
         var invalidAction = () => account.Execute(invalidTransaction);
 
@@ -33,7 +29,7 @@ public class AccountTests
     [MemberData(nameof(ValidTransactionsGenerator))]
     public void Should_Allow_Valid_Transaction(TransactionRequest transaction)
     {
-        var account = new Account(1, 10000, -9998);
+        var account = new Account(1, 10000, -9998, []);
 
         account.CanExecute(transaction).Should().BeTrue();
     }
@@ -42,14 +38,15 @@ public class AccountTests
     [MemberData(nameof(ValidTransactionsGenerator))]
     public void Executed_Transactions_Should_Add_To_Account(TransactionRequest transaction)
     {
-        var account = new Account(1, 10000, -9998);
+        var account = new Account(1, 10000, -9998, []);
 
         account.Execute(transaction);
         
         var existing = account.Transactions.Single(x 
             => x.Valor == transaction.Valor 
                 && x.Descricao == transaction.Descricao 
-                && x.Tipo == transaction.Tipo);
+                && x.Tipo == transaction.Tipo
+                && x.AccountId == account.Id);
 
         existing.Should().NotBeNull();
     }
@@ -59,7 +56,7 @@ public class AccountTests
     public void Executing_Transactions_Should_Change_Balance(int accountBalance, 
         int expectedBalance, TransactionRequest transaction)
     {
-        var account = new Account(1, 10000, accountBalance);
+        var account = new Account(1, 10000, accountBalance, []);
 
         account.Execute(transaction);
 

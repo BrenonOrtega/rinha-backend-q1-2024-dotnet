@@ -7,7 +7,7 @@ public class Repository
 {
     private readonly DbContext context;
 
-    public Repository(DbContext context)
+    public Repository(RinhaBackendDbContext context)
     {
         this.context = context ?? throw new ArgumentNullException(nameof(context));
     }
@@ -24,8 +24,25 @@ public class Repository
         return account;
     }
 
-    public Task<BankStatement> GetBankStatementAsync(int id)
+    public async Task<BankStatement?> GetBankStatementAsync(int id)
     {
-        throw new NotImplementedException();
+        var projection = await context.Set<Account>()
+            .Where(x => x.Id == id)
+            .Select(x => new { x.Limite, x.Saldo, Transactions = x.Transactions.Select(t => new { t.Valor, t.RealizadaEm, t.Descricao, t.Tipo }) })
+            .FirstOrDefaultAsync();
+
+        if (projection is null)
+            return null;
+
+        return new BankStatement(
+            new Balance(projection.Saldo, projection.Limite), 
+            projection.Transactions.Select(x => new BankStatementTransaction(x.Valor, x.Tipo, x.Descricao, x.RealizadaEm)).ToList());
+    }
+
+    public async Task SaveAsync(Account account)
+    {
+        context.Set<Account>().Add(account);
+
+        await context.SaveChangesAsync();
     }
 }
