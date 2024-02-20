@@ -43,7 +43,7 @@ public sealed class Repository
             return new Account(id, limite, saldo);
         }
 
-        return null; 
+        return null;
     }
 
     public async Task<BankStatement?> GetBankStatementAsync(int id)
@@ -58,7 +58,7 @@ public sealed class Repository
         using var conn = dataSource.CreateConnection();
 
         await conn.OpenAsync();
-        
+
         using var command = new NpgsqlCommand(sql, conn);
         command.Parameters.AddWithValue("@Id", id);
 
@@ -70,22 +70,34 @@ public sealed class Repository
         {
             if (balance == null)
             {
-                var limite = reader.GetInt32(0);
-                var saldo = reader.GetInt32(1);
+                var limite = reader.GetInt64(0);
+                var saldo = reader.GetInt64(1);
 
                 balance = new Balance(saldo, limite);
             }
 
-            // Retrieve data from the reader
-            var realizadaEm = reader.GetDateTime(2);
-            var valor = reader.GetInt32(3);
-            var tipo = reader.GetString(4);
-            var descricao = reader.GetString(5);
+            try
+            {
+                var realizadaEm = reader.IsDBNull(2) ? default : reader.GetDateTime(2);
+                if (realizadaEm == default)
+                    continue;
 
-            transactions.Add(new BankStatementTransaction(valor, tipo, descricao, realizadaEm));
+                var valor = reader.GetInt64(3);
+                var tipo = reader.GetChar(4);
+                var descricao = reader.GetString(5);
+
+                transactions.Add(new BankStatementTransaction(valor, tipo, descricao, realizadaEm));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
         }
 
-        return new BankStatement(balance.Value, transactions);
+        if (balance.HasValue)
+            return new BankStatement(balance.Value, transactions);
+        
+        return null;
     }
 
     public async Task Save(Account account, Transaction transaction)
@@ -102,12 +114,12 @@ public sealed class Repository
         var command = conn.CreateCommand();
 
         command.CommandText = sql;
-        command.Parameters.AddWithValue("@Id", account.Id);
-        command.Parameters.AddWithValue("@Limite", account.Saldo);
-        command.Parameters.AddWithValue("@Saldo", account.Limite);
-        command.Parameters.AddWithValue("@Tipo", transaction.Tipo);
-        command.Parameters.AddWithValue("@Valor", transaction.Valor);
-        command.Parameters.AddWithValue("@Descricao", transaction.Descricao);
+        command.Parameters.AddWithValue("@Id", NpgsqlDbType.Integer, account.Id);
+        command.Parameters.AddWithValue("@Limite", NpgsqlDbType.Bigint, account.Limite);
+        command.Parameters.AddWithValue("@Saldo", NpgsqlDbType.Bigint, account.Saldo);
+        command.Parameters.AddWithValue("@Tipo", NpgsqlDbType.Varchar, transaction.Tipo);
+        command.Parameters.AddWithValue("@Valor", NpgsqlDbType.Bigint, transaction.Valor);
+        command.Parameters.AddWithValue("@Descricao", NpgsqlDbType.Varchar, transaction.Descricao);
 
         var affectedRows = await command.ExecuteNonQueryAsync();
 

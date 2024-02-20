@@ -3,30 +3,32 @@ using Microsoft.Extensions.DependencyInjection;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using FluentAssertions;
+using Npgsql;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 
 public sealed class RepositoryTests : IDisposable
 {
+    private readonly NpgsqlDataSource dataSource;
     private readonly Repository repo;
 
-     [Fact]
-     public async Task Saving_Account_Should_Succeed()
-     {
-         var account = new Account(10_000_000, 50_000);
-         var transaction = new Transaction(1, "c", "aaaa", 1);
+    [Fact]
+    public async Task Saving_Account_Should_Succeed()
+    {
+        var account = new Account(10_000_000, 50_000);
+        var transaction = new Transaction(1, 'c', "aaaa", 1);
 
-         await repo.Save(account, transaction);
+        await repo.Save(account, transaction);
 
-         var existing = await repo.GetAccountByIdAsync(account.Id);
+        var existing = await repo.GetAccountByIdAsync(account.Id);
 
-         existing.Should().BeEquivalentTo(account);
-     }
+        existing.Should().BeEquivalentTo(account);
+    }
 
     [Fact]
     public async Task Getting_Bank_Statement_Should_Work()
     {
-        var transaction = new Transaction(5, "c", "existing", 1);
+        var transaction = new Transaction(5, 'c', "existing", 1);
         var account = new Account(1, 10_000_000, 50_000);
 
         await repo.Save(account, transaction);
@@ -43,22 +45,26 @@ public sealed class RepositoryTests : IDisposable
 
     public RepositoryTests()
     {
-        const string connectionString = "Server=localhost;Port=5432;Database=rinha_backend;User Id=postgres;Password=postgres;Include Error Detail=true;";
+        const string connectionString = "Server=localhost;Port=5432;Database=rinha_database;User Id=postgres;Password=postgres;Include Error Detail=true;";
 
         var services = new ServiceCollection()
             .ConfigureInfrastructure(connectionString)
             .BuildServiceProvider();
 
-        //context = services.GetRequiredService<RinhaBackendDbContext>();
-        //context.Database.EnsureCreated();
-        //transaction = context.Database.BeginTransaction();
+        dataSource = services.GetRequiredService<NpgsqlDataSource>();
         repo = services.GetRequiredService<Repository>();
     }
 
     public void Dispose()
     {
-        //transaction.Rollback();
-        //context.Database.EnsureDeleted();
-        //context.Dispose();
+        using var conn = dataSource.CreateConnection();
+        using var command = new NpgsqlCommand(@"
+            BEGIN;
+            TRUNCATE TABLE Transactions;
+            COMMIT;", conn);
+
+        conn.Open();
+
+        command.ExecuteNonQuery();
     }
 }

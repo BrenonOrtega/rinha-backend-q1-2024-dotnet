@@ -5,24 +5,30 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.UnitTests;
 
 public sealed class AccountTests
 {
-    readonly TransactionRequest invalidTransaction = new (3, "d", "Debito que deixaria a conta com valor menor que o limite");
+    readonly TransactionRequest invalidTransaction = new(3, 'd', "Debito que deixaria a conta com valor menor que o limite");
 
-    [Fact]
-    public void Shouldnt_Allow_invalid_Transaction()
+    [Theory]
+    [MemberData(nameof(InvalidTransactionsGenerator))]
+    public void Shouldnt_Allow_invalid_Transaction(long balance, TransactionRequest invalidTransaction)
     {
-        var account = new Account(1, 10000, -9998);
+        var account = new Account(1, 10000, balance);
 
         account.CanExecute(invalidTransaction).Should().BeFalse();
     }
-
-    [Fact]
-    public void Executing_invalid_Transaction_Should_Throw()
+    
+    public static IEnumerable<object[]> InvalidTransactionsGenerator()
     {
-        var account = new Account(1, 10000, -9998);
+        var balance = -9998;
+        yield return [balance, new TransactionRequest(3, 'e', "debito")];
+        yield return [balance, new TransactionRequest(10, 'e', "debito")];
+        yield return [balance, new TransactionRequest(1, ' ', "debito")];
+        yield return [balance, new TransactionRequest(1, '0', "debito")];
+        yield return [balance, new TransactionRequest(1, 'f', "debito")];
+        yield return [balance, new TransactionRequest(1, 'g', "debito")];
+        yield return [balance, new TransactionRequest(1, 'g', "")];
+        yield return [balance, new TransactionRequest(1, 'g', null)];
+        yield return [balance, new TransactionRequest(1, 'g', "STR 11 CHARS")];
 
-        var invalidAction = () => account.Execute(invalidTransaction);
-
-        invalidAction.Should().Throw<InvalidOperationException>();
     }
 
     [Theory]
@@ -41,13 +47,13 @@ public sealed class AccountTests
         var account = new Account(1, 10000, -9998);
 
         var actual = account.Execute(transaction);
-        
+
         actual.Should().NotBeNull();
     }
 
     [Theory]
     [MemberData(nameof(ValidTransactionsGeneratorWithExpectedBalance))]
-    public void Executing_Transactions_Should_Change_Balance(int accountBalance, 
+    public void Executing_Transactions_Should_Change_Balance(int accountBalance,
         int expectedBalance, TransactionRequest transaction)
     {
         var account = new Account(1, 10000, accountBalance);
@@ -59,16 +65,22 @@ public sealed class AccountTests
 
     public static IEnumerable<object[]> ValidTransactionsGenerator()
     {
-        yield return [ new TransactionRequest(3, "c", "Credito em conta") ];
-        yield return [ new TransactionRequest(2, "d", "Debito que deixa a conta no limite") ];
-        yield return [ new TransactionRequest(1, "d", "debito que deixa a conta 1 centavo antes do limite") ];
+        yield return [new TransactionRequest(3, 'c', "Credito")];
+        // "Debito que deixa a conta no limite"
+        yield return [new TransactionRequest(2, 'd', "Debito")];
+        //debito que deixa a conta 1 centavo antes do limite"
+        yield return [new TransactionRequest(1, 'd', "1c antes lim")];
+        //Descricao 10 characteres
+        yield return [new TransactionRequest(3, 'd', "0123456789")];
     }
 
     public static IEnumerable<object[]> ValidTransactionsGeneratorWithExpectedBalance()
     {
         var balance = -9998;
-        yield return [ balance, -9995, new TransactionRequest(3, "c", "Credito em conta") ];
-        yield return [ balance, -10000, new TransactionRequest(2, "d", "Debito que deixa a conta no limite") ];
-        yield return [ balance, -9999, new TransactionRequest(1, "d", "debito que deixa a conta 1 centavo antes do limite") ];
+        yield return [balance, -9995, new TransactionRequest(3, 'c', "Credito em conta")];
+        yield return [balance, -10000, new TransactionRequest(2, 'd', "fica limi.")];
+        yield return [balance, -10000, new TransactionRequest(2, 'd', "")];
+        yield return [balance, -10000, new TransactionRequest(2, 'd', "null")];
+        yield return [balance, -9999, new TransactionRequest(1, 'd', "debito")];
     }
 }

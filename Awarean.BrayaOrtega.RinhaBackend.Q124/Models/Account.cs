@@ -2,6 +2,9 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
 public sealed class Account
 {
+    private const char Credit = 'c';
+    private const char Debit = 'd';
+
     public Account(long limite, long saldo)
         : this(default, limite, saldo)
     {
@@ -23,7 +26,16 @@ public sealed class Account
 
     public bool CanExecute(TransactionRequest transaction)
     {
-        if (transaction.Tipo == "d")
+        var transactionType = transaction.Tipo;
+
+        if (transactionType is not Credit and not Debit)
+            return false;
+
+        if (transaction.Descricao is { Length: 0 or > 10 })
+            return false; 
+
+
+        if (transactionType is Debit)
         {
             long remainingLimit = GetRemainingLimit();
             return transaction.Valor <= remainingLimit;
@@ -38,15 +50,10 @@ public sealed class Account
     {
         long valor = transaction.Valor;
 
-        _ = transaction.Tipo switch
-        {
-            "c" => Saldo += valor,
-            "d" => Saldo -= valor,
-            _ => throw new InvalidOperationException("Operacao nao permitida. As operacoes permitidas sao (c) Credito e (d) Debito.")
-        };
-
-        if (GetRemainingLimit() < 0)
-            throw new InvalidOperationException();
+        if (transaction.Tipo is Credit)
+             Saldo += valor;
+        else 
+            Saldo -= valor;
 
         return new Transaction(valor, transaction.Tipo, transaction.Descricao, Id);
     }
