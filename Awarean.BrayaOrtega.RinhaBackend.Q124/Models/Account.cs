@@ -1,8 +1,5 @@
-using Dapper;
-
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-[type:DapperAot]
 public sealed class Account
 {
     public Account(long limite, long saldo)
@@ -11,7 +8,6 @@ public sealed class Account
 
     }
 
-    [ExplicitConstructor]
     public Account(int id, long limite, long saldo)
     {
         Id = id;

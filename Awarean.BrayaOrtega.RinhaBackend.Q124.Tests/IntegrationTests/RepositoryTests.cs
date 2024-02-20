@@ -3,28 +3,25 @@ using Microsoft.Extensions.DependencyInjection;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 
 public sealed class RepositoryTests : IDisposable
 {
-    //private readonly RinhaBackendDbContext context;
-    private readonly IDbContextTransaction transaction;
     private readonly Repository repo;
 
-    //  [Fact]
-    //  public async Task Saving_Account_Should_Succeed()
-    //  {
-    //      var account = new Account(10_000_000, 50_000);
+     [Fact]
+     public async Task Saving_Account_Should_Succeed()
+     {
+         var account = new Account(10_000_000, 50_000);
+         var transaction = new Transaction(1, "c", "aaaa", 1);
 
-    //      await repo.SaveAsync(account);
+         await repo.Save(account, transaction);
 
-    //      var existing = await repo.GetAccountByIdAsync(account.Id);
+         var existing = await repo.GetAccountByIdAsync(account.Id);
 
-    //      existing.Should().BeEquivalentTo(account);
-    //  }
+         existing.Should().BeEquivalentTo(account);
+     }
 
     [Fact]
     public async Task Getting_Bank_Statement_Should_Work()

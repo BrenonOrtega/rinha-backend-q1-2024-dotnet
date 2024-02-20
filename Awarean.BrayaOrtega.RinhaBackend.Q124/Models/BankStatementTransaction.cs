@@ -1,9 +1,5 @@
-using System.Text.Json.Serialization;
-using Dapper;
-
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-[type: DapperAot]
 public struct BankStatementTransaction(long valor, string tipo, string descricao, DateTime realizadaEm)
 {
     public long Valor { get; } = valor;

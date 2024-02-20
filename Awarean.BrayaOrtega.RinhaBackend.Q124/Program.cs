@@ -3,11 +3,9 @@ using Awarean.BrayaOrtega.RinhaBackend.Q124;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
-using Dapper;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 
-[module: DapperAot]
 var builder = WebApplication.CreateSlimBuilder(args);
 //var builder = WebApplication.CreateBuilder(args);
 

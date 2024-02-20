@@ -1,9 +1,7 @@
 using System.Text.Json.Serialization;
-using Dapper;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-[type: DapperAot]
 public struct BankStatement
 {
     public BankStatement(Balance saldo, List<BankStatementTransaction> ultimasTransacoes)

@@ -1,11 +1,11 @@
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using Npgsql;
-using Dapper;
+using NpgsqlTypes;
 using System.Data;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 
-public class Repository
+public sealed class Repository
 {
     private readonly NpgsqlDataSource dataSource;
 
@@ -17,15 +17,33 @@ public class Repository
     public async Task<Account> GetAccountByIdAsync(int id)
     {
         var sql = "SELECT Id, Limite, Saldo FROM accounts WHERE Id = @Id";
-        var parameters = new DynamicParameters();
 
-        parameters.Add("@Id", id, DbType.Int32);
+        using var conn = dataSource.CreateConnection();
+        var parameters = new NpgsqlParameter("@Id", NpgsqlDbType.Integer) { Value = id };
 
-        var conn = dataSource.CreateConnection();
-
-        var account = await conn.QueryFirstAsync<Account>(sql, parameters);
+        await conn.OpenAsync();
+        var account = await ReadAccountAsync(conn, sql, parameters);
 
         return account;
+    }
+
+    private static async Task<Account> ReadAccountAsync(NpgsqlConnection conn, string sql, NpgsqlParameter parameter)
+    {
+        using var command = conn.CreateCommand();
+        command.CommandText = sql;
+        command.Parameters.Add(parameter);
+
+        using var reader = await command.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            var id = reader.GetInt32(0);
+            var limite = reader.GetInt64(1);
+            var saldo = reader.GetInt64(2);
+
+            return new Account(id, limite, saldo);
+        }
+
+        return null; 
     }
 
     public async Task<BankStatement?> GetBankStatementAsync(int id)
@@ -39,6 +57,8 @@ public class Repository
 
         using var conn = dataSource.CreateConnection();
 
+        await conn.OpenAsync();
+        
         using var command = new NpgsqlCommand(sql, conn);
         command.Parameters.AddWithValue("@Id", id);
 
@@ -63,8 +83,8 @@ public class Repository
             var descricao = reader.GetString(5);
 
             transactions.Add(new BankStatementTransaction(valor, tipo, descricao, realizadaEm));
-
         }
+
         return new BankStatement(balance.Value, transactions);
     }
 
@@ -73,22 +93,23 @@ public class Repository
         var sql = @"BEGIN;
                     UPDATE Accounts SET Limite = @Limite, Saldo = @Saldo WHERE Id = @Id;
                     INSERT INTO Transactions (Tipo, Valor, Descricao, RealizadaEm, AccountId)
-                    VALUES (@TIPO, @Valor, @Descricao, now(), @Id);
+                    VALUES (@Tipo, @Valor, @Descricao, now(), @Id);
                     COMMIT";
 
-        var parameters = new DynamicParameters();
+        using var conn = dataSource.CreateConnection();
+        await conn.OpenAsync();
 
-        parameters.Add("@Id", account.Id, DbType.Int32);
-        parameters.Add("@Limite", account.Saldo, DbType.Int32);
-        parameters.Add("@Saldo", account.Limite, DbType.Int32);
+        var command = conn.CreateCommand();
 
-        parameters.Add("@Tipo", transaction.Tipo, DbType.StringFixedLength, size: 1);
-        parameters.Add("@Valor", transaction.Valor, DbType.Int64);
-        parameters.Add("@Descricao", transaction.Descricao, DbType.String, size: 10);
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("@Id", account.Id);
+        command.Parameters.AddWithValue("@Limite", account.Saldo);
+        command.Parameters.AddWithValue("@Saldo", account.Limite);
+        command.Parameters.AddWithValue("@Tipo", transaction.Tipo);
+        command.Parameters.AddWithValue("@Valor", transaction.Valor);
+        command.Parameters.AddWithValue("@Descricao", transaction.Descricao);
 
-        var conn = dataSource.CreateConnection();
-
-        var affectedRows = await conn.ExecuteAsync(sql, parameters);
+        var affectedRows = await command.ExecuteNonQueryAsync();
 
         if (affectedRows != 2)
             throw new InvalidOperationException();
