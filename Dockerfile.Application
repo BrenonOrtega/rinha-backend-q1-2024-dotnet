@@ -15,8 +15,9 @@ RUN dotnet build "./Awarean.BrayaOrtega.RinhaBackend.Q124.csproj" -c $BUILD_CONF
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./Awarean.BrayaOrtega.RinhaBackend.Q124.csproj" \
+    --self-contained \
     -c $BUILD_CONFIGURATION \
-    -o /app/publish /p:UseAppHost=true
+    -o /app/publish /p:UseAppHost=true 
 
 FROM base as final
 WORKDIR /app

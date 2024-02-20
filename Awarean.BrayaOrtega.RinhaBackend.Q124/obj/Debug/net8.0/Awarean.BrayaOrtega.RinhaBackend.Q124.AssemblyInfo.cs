@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Awarean.BrayaOrtega.RinhaBackend.Q124")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+11a5d8e6e40504535df0bd24eea3a0992533ec18")]
 [assembly: System.Reflection.AssemblyProductAttribute("Awarean.BrayaOrtega.RinhaBackend.Q124")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Awarean.BrayaOrtega.RinhaBackend.Q124")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

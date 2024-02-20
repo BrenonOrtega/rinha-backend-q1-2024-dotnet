@@ -10,7 +10,7 @@ public sealed class AccountTests
     [Fact]
     public void Shouldnt_Allow_invalid_Transaction()
     {
-        var account = new Account(1, 10000, -9998, []);
+        var account = new Account(1, 10000, -9998);
 
         account.CanExecute(invalidTransaction).Should().BeFalse();
     }
@@ -18,7 +18,7 @@ public sealed class AccountTests
     [Fact]
     public void Executing_invalid_Transaction_Should_Throw()
     {
-        var account = new Account(1, 10000, -9998, []);
+        var account = new Account(1, 10000, -9998);
 
         var invalidAction = () => account.Execute(invalidTransaction);
 
@@ -29,7 +29,7 @@ public sealed class AccountTests
     [MemberData(nameof(ValidTransactionsGenerator))]
     public void Should_Allow_Valid_Transaction(TransactionRequest transaction)
     {
-        var account = new Account(1, 10000, -9998, []);
+        var account = new Account(1, 10000, -9998);
 
         account.CanExecute(transaction).Should().BeTrue();
     }
@@ -38,17 +38,11 @@ public sealed class AccountTests
     [MemberData(nameof(ValidTransactionsGenerator))]
     public void Executed_Transactions_Should_Add_To_Account(TransactionRequest transaction)
     {
-        var account = new Account(1, 10000, -9998, []);
+        var account = new Account(1, 10000, -9998);
 
-        account.Execute(transaction);
+        var actual = account.Execute(transaction);
         
-        var existing = account.Transactions.Single(x 
-            => x.Valor == transaction.Valor 
-                && x.Descricao == transaction.Descricao 
-                && x.Tipo == transaction.Tipo
-                && x.AccountId == account.Id);
-
-        existing.Should().NotBeNull();
+        actual.Should().NotBeNull();
     }
 
     [Theory]
@@ -56,7 +50,7 @@ public sealed class AccountTests
     public void Executing_Transactions_Should_Change_Balance(int accountBalance, 
         int expectedBalance, TransactionRequest transaction)
     {
-        var account = new Account(1, 10000, accountBalance, []);
+        var account = new Account(1, 10000, accountBalance);
 
         account.Execute(transaction);
 

@@ -1,34 +1,29 @@
+using Dapper;
+
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
+[type:DapperAot]
 public sealed class Account
 {
     public Account(long limite, long saldo)
-        : this(default, limite, saldo, [])
+        : this(default, limite, saldo)
     {
 
     }
 
+    [ExplicitConstructor]
     public Account(int id, long limite, long saldo)
-        : this(id, limite, saldo, [])
-    {
-
-    }
-
-    public Account(int id, long limite, long saldo, List<Transaction> transactions)
     {
         Id = id;
         Limite = limite;
         Saldo = saldo;
-        Transactions = transactions ?? [];
     }
 
-    public int Id { get; private set; }
+    public int Id { get; set; }
 
-    public long Limite { get; private set; }
+    public long Limite { get; set; }
 
-    public long Saldo { get; private set; }
-
-    public List<Transaction> Transactions { get; private set; }
+    public long Saldo { get; set; }
 
     public bool CanExecute(TransactionRequest transaction)
     {
@@ -43,7 +38,7 @@ public sealed class Account
 
     private long GetRemainingLimit() => Limite + Saldo;
 
-    public void Execute(TransactionRequest transaction)
+    public Transaction Execute(TransactionRequest transaction)
     {
         long valor = transaction.Valor;
 
@@ -57,6 +52,6 @@ public sealed class Account
         if (GetRemainingLimit() < 0)
             throw new InvalidOperationException();
 
-        Transactions.Add(new Transaction(valor, transaction.Tipo, transaction.Descricao, Id));
+        return new Transaction(valor, transaction.Tipo, transaction.Descricao, Id);
     }
 }

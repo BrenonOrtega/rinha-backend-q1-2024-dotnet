@@ -1,13 +1,20 @@
 using System.Text.Json.Serialization;
+using Dapper;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-public readonly struct Balance(long total, long limite)
+[type: DapperAot]
+public struct Balance(long total, long limite)
 {
-    public long Total { get; } = total;
+    public Balance() : this(0, 0)
+    {
+
+    }
+
+    public long Total { get; set; } = total;
 
     [JsonPropertyName("data_extrato")]
     public DateTime DataExtrato { get; } = DateTime.Now;
 
-    public long Limite { get; } = limite;
+    public long Limite { get; set; } = limite;
 }

@@ -34,6 +34,9 @@ services:
       - rinha_backend
     ports:
       - "9999:9999"
+    depends_on:
+      - webapi1
+      - webapi2
     deploy:
       resources:
         limits:
@@ -46,10 +49,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    networks:
+      POSTGRES_DB: rinha_database
+    networks: 
       - rinha_backend
     ports:
       - "5432:5432"
+    volumes:
+      - ./postgres:/docker-entrypoint-initdb.d
     deploy:
       resources:
         limits:

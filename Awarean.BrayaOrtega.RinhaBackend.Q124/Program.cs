@@ -1,13 +1,21 @@
+using System.Text.Json.Serialization;
 using Awarean.BrayaOrtega.RinhaBackend.Q124;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
+using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
+using Dapper;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 
+[module: DapperAot]
 var builder = WebApplication.CreateSlimBuilder(args);
+//var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+  options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
+});
+
 builder.Services.AddLogging();
 builder.Services.AddHttpLogging(x => { x.LoggingFields = HttpLoggingFields.All; });
 builder.Services.ConfigureInfrastructure(builder.Configuration.GetConnectionString("Postgres"));
@@ -18,12 +26,12 @@ app.MapGet("/", () => "Im working!")
     .WithHttpLogging(HttpLoggingFields.All);
 
 app.MapGet("/clientes/{id:int}/extrato", 
-    (int id, [FromServices]Repository repo) =>
+    async (int id, [FromServices]Repository repo) =>
     {
-        var account = repo.GetBankStatementAsync(id);
+        var bankStatement = await repo.GetBankStatementAsync(id);
 
-        if (account is not null)
-            return Results.Ok(account);
+        if (bankStatement is not null)
+            return Results.Ok(bankStatement);
 
         return Results.NotFound();
     });
@@ -41,12 +49,20 @@ app.MapPost("/clientes/{id:int}/transacoes", async (
         if (account.CanExecute(transaction) is false)
             return Results.UnprocessableEntity();
 
-        account.Execute(transaction);
+        var createdTransaction = account.Execute(transaction);
         
-        await repo.SaveChanges();
+        await repo.Save(account, createdTransaction);
 
         return Results.Ok();
     })
     .WithHttpLogging(HttpLoggingFields.All);
 
 app.Run();
+
+[JsonSerializable(typeof(TransactionRequest))]
+[JsonSerializable(typeof(TransactionResponse))]
+[JsonSerializable(typeof(BankStatement))]
+internal partial class AppJsonSerializerContext : JsonSerializerContext
+{
+
+}
