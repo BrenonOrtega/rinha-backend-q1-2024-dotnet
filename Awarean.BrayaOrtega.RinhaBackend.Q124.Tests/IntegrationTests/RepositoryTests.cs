@@ -10,7 +10,7 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 public sealed class RepositoryTests : IDisposable
 {
     private readonly NpgsqlDataSource dataSource;
-    private readonly Repository repo;
+    private readonly IRepository repo;
 
     [Fact]
     public async Task Saving_Account_Should_Succeed()
@@ -35,10 +35,10 @@ public sealed class RepositoryTests : IDisposable
 
         var statement = await repo.GetBankStatementAsync(account.Id);
 
-        statement.Value.Saldo.Total.Should().Be(account.Saldo);
-        statement.Value.Saldo.Limite.Should().Be(account.Limite);
+        statement.Saldo.Total.Should().Be(account.Saldo);
+        statement.Saldo.Limite.Should().Be(account.Limite);
 
-        statement.Value.UltimasTransacoes.Should()
+        statement.UltimasTransacoes.Should()
             .ContainEquivalentOf(
                 new BankStatementTransaction(transaction.Valor, transaction.Tipo, transaction.Descricao, transaction.RealizadaEm));
     }
@@ -46,13 +46,14 @@ public sealed class RepositoryTests : IDisposable
     public RepositoryTests()
     {
         const string connectionString = "Server=localhost;Port=5432;Database=rinha_database;User Id=postgres;Password=postgres;Include Error Detail=true;";
-
+        const string redisString = "localhost:6379,password=redis,ssl=False";
+        
         var services = new ServiceCollection()
-            .ConfigureInfrastructure(connectionString)
+            .ConfigureInfrastructure(connectionString, redisString)
             .BuildServiceProvider();
 
         dataSource = services.GetRequiredService<NpgsqlDataSource>();
-        repo = services.GetRequiredService<Repository>();
+        repo = services.GetRequiredService<IRepository>();
     }
 
     public void Dispose()

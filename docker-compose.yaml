@@ -9,16 +9,17 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
     networks:
-      - rinha_backend
+      - rinha_network
     ports:
       - "5000:8080"
     depends_on:
       - postgres
+      - cache
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: "170MB"
+          cpus: "0.35"
+          memory: "120MB"
 
   webapi2:
     <<: *api 
@@ -31,7 +32,7 @@ services:
       context: .
       dockerfile: Dockerfile.LoadBalancer
     networks:
-      - rinha_backend
+      - rinha_network
     ports:
       - "9999:9999"
     depends_on:
@@ -40,8 +41,25 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
+          cpus: "0.3"
           memory: "30MB"
+
+  cache:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - rinha_network
+    environment:
+      - REDIS_PASSWORD=redis
+      - REDIS_MAXMEMORY_POLICY=allkeys-lru
+      - REDIS_MAXMEMORY=1gb
+      - REDIS_MAXMEMORY_SAMPLES=5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "100MB"
 
   postgres:
     image: postgres
@@ -51,7 +69,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: rinha_database
     networks: 
-      - rinha_backend
+      - rinha_network
     ports:
       - "5432:5432"
     volumes:
@@ -60,8 +78,8 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "200MB"
+          memory: "190MB"
 
 networks:
-  rinha_backend:
+  rinha_network:
     driver: bridge

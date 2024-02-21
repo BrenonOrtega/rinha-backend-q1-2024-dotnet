@@ -5,17 +5,18 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
 
 public sealed class TransactionRequest(long valor, char tipo, string descricao)
 {
-    [Required]
-    [Range(0, long.MaxValue)]
     [JsonPropertyName("valor")]
     public long Valor { get; } = valor;
 
-    [Required]
-    [AllowedValues("c", "d", "C", "D")]
     [JsonPropertyName("tipo")]
     public char Tipo { get; } = tipo;
 
-    [Required]
     [JsonPropertyName("descricao")]
     public string Descricao { get; } = descricao;
+
+    public bool IsInvalid() 
+        => Valor < 0 
+        || Tipo is not Transaction.Credit and not Transaction.Debit
+        || string.IsNullOrEmpty(Descricao) 
+        || Descricao.Length > 10;
 }

@@ -1,6 +1,6 @@
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-public struct BankStatementTransaction(long valor, char tipo, string descricao, DateTime realizadaEm)
+public readonly struct BankStatementTransaction(long valor, char tipo, string descricao, DateTime realizadaEm)
 {
     public long Valor { get; } = valor;
 

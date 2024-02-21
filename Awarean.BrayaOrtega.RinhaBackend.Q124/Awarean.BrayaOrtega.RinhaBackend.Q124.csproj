@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
+    <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Awarean.BrayaOrtega.RinhaBackend.Q124</RootNamespace>
     <UserSecretsId>fd7fb28e-6bc7-4f43-9d8d-df151bca06e7</UserSecretsId>
@@ -16,6 +16,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.5" />
     <PackageReference Include="Npgsql" Version="8.0.2" />
+    <PackageReference Include="StackExchange.Redis" Version="2.7.20" />
   </ItemGroup>
 
 </Project>

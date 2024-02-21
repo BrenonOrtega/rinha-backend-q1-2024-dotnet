@@ -1,11 +1,10 @@
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using Npgsql;
 using NpgsqlTypes;
-using System.Data;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 
-public sealed class Repository
+public class Repository : IRepository
 {
     private readonly NpgsqlDataSource dataSource;
 
@@ -23,7 +22,7 @@ public sealed class Repository
 
         await conn.OpenAsync();
         var account = await ReadAccountAsync(conn, sql, parameters);
-
+        await conn.CloseAsync();
         return account;
     }
 
@@ -40,35 +39,49 @@ public sealed class Repository
             var limite = reader.GetInt64(1);
             var saldo = reader.GetInt64(2);
 
+            await conn.CloseAsync();
+
             return new Account(id, limite, saldo);
         }
 
-        return null;
+        await conn.CloseAsync();
+
+        return new Account();
     }
 
-    public async Task<BankStatement?> GetBankStatementAsync(int id)
+    public async Task<BankStatement> GetBankStatementAsync(int id)
     {
-        // Don't do this if your not using a strongly typed language and 
-        // even more if you're using strings as parameters
         var sql = @$"SELECT Limite, Saldo, RealizadaEm, Valor, Tipo, Descricao
             FROM Accounts a 
             LEFT JOIN Transactions t ON t.AccountId = a.Id
-            WHERE a.Id = @Id;";
+            WHERE a.Id = @Id
+            ORDER BY RealizadaEm DESC
+            LIMIT 10;";
 
         using var conn = dataSource.CreateConnection();
-
-        await conn.OpenAsync();
 
         using var command = new NpgsqlCommand(sql, conn);
         command.Parameters.AddWithValue("@Id", id);
 
+        await conn.OpenAsync();
+
         var reader = await command.ExecuteReaderAsync();
 
-        Balance? balance = null;
-        List<BankStatementTransaction> transactions = new();
+        var bankStatement = CreateBankStatement(reader);
+
+        await conn.CloseAsync();
+
+        return bankStatement;
+    }
+
+    private static BankStatement CreateBankStatement(NpgsqlDataReader reader)
+    {
+        Balance balance = new();
+        List<BankStatementTransaction> transactions = [];
+
         while (reader.Read())
         {
-            if (balance == null)
+            if (balance.IsEmpty())
             {
                 var limite = reader.GetInt64(0);
                 var saldo = reader.GetInt64(1);
@@ -94,10 +107,10 @@ public sealed class Repository
             }
         }
 
-        if (balance.HasValue)
-            return new BankStatement(balance.Value, transactions);
-        
-        return null;
+        if (!balance.IsEmpty())
+            return new BankStatement(balance, transactions);
+
+        return new BankStatement();
     }
 
     public async Task Save(Account account, Transaction transaction)
@@ -109,7 +122,6 @@ public sealed class Repository
                     COMMIT";
 
         using var conn = dataSource.CreateConnection();
-        await conn.OpenAsync();
 
         var command = conn.CreateCommand();
 
@@ -121,7 +133,11 @@ public sealed class Repository
         command.Parameters.AddWithValue("@Valor", NpgsqlDbType.Bigint, transaction.Valor);
         command.Parameters.AddWithValue("@Descricao", NpgsqlDbType.Varchar, transaction.Descricao);
 
+        await conn.OpenAsync();
+
         var affectedRows = await command.ExecuteNonQueryAsync();
+
+        await conn.CloseAsync();
 
         if (affectedRows != 2)
             throw new InvalidOperationException();

@@ -1,10 +1,8 @@
+
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-public sealed class Account
+public struct Account
 {
-    private const char Credit = 'c';
-    private const char Debit = 'd';
-
     public Account(long limite, long saldo)
         : this(default, limite, saldo)
     {
@@ -18,24 +16,27 @@ public sealed class Account
         Saldo = saldo;
     }
 
-    public int Id { get; set; }
+    public Account() : this(default, default, default)
+    {
+    }
 
-    public long Limite { get; set; }
+    public int Id { get; }
 
-    public long Saldo { get; set; }
+    public long Limite { get; }
 
-    public bool CanExecute(TransactionRequest transaction)
+    public long Saldo { get; private set;}
+
+    public readonly bool CanExecute(TransactionRequest transaction)
     {
         var transactionType = transaction.Tipo;
 
-        if (transactionType is not Credit and not Debit)
+        if (transactionType is not Transaction.Credit and not Transaction.Debit)
             return false;
 
-        if (transaction.Descricao is { Length: 0 or > 10 })
+        if (transaction.Descricao is null or { Length: 0 or > 10 })
             return false; 
 
-
-        if (transactionType is Debit)
+        if (transactionType is Transaction.Debit)
         {
             long remainingLimit = GetRemainingLimit();
             return transaction.Valor <= remainingLimit;
@@ -44,17 +45,19 @@ public sealed class Account
         return true;
     }
 
-    private long GetRemainingLimit() => Limite + Saldo;
+    private readonly long GetRemainingLimit() => Limite + Saldo;
 
     public Transaction Execute(TransactionRequest transaction)
     {
         long valor = transaction.Valor;
 
-        if (transaction.Tipo is Credit)
+        if (transaction.Tipo is Transaction.Credit)
              Saldo += valor;
         else 
             Saldo -= valor;
 
         return new Transaction(valor, transaction.Tipo, transaction.Descricao, Id);
     }
+
+    internal readonly bool IsEmpty() => Id is 0 && Saldo is 0 && Limite is 0;
 }
