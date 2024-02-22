@@ -15,28 +15,28 @@ public sealed class RepositoryTests : IDisposable
     [Fact]
     public async Task Saving_Account_Should_Succeed()
     {
-        var account = new Account(10_000_000, 50_000);
-        var transaction = new Transaction(1, 'c', "aaaa", 1);
+        var transaction = new Transaction(5, 'c', "existing", 1, 50_000, 0, DateTime.UtcNow);
 
-        await repo.Save(account, transaction);
+        await repo.Save(transaction);
 
-        var existing = await repo.GetAccountByIdAsync(account.Id);
+        var actual = await repo.GetAccountByIdAsync(transaction.AccountId);
 
-        existing.Should().BeEquivalentTo(account);
+        actual.Limite.Should().Be(transaction.Limite);
+        actual.Saldo.Should().Be(transaction.Saldo);
+        actual.Id.Should().Be(transaction.AccountId);
     }
 
     [Fact]
     public async Task Getting_Bank_Statement_Should_Work()
     {
-        var transaction = new Transaction(5, 'c', "existing", 1);
-        var account = new Account(1, 10_000_000, 50_000);
+        var transaction = new Transaction(5, 'c', "existing", 1, 50_000, 0, DateTime.UtcNow);
 
-        await repo.Save(account, transaction);
+        await repo.Save(transaction);
 
-        var statement = await repo.GetBankStatementAsync(account.Id);
+        var statement = await repo.GetBankStatementAsync(transaction.AccountId);
 
-        statement.Saldo.Total.Should().Be(account.Saldo);
-        statement.Saldo.Limite.Should().Be(account.Limite);
+        statement.Saldo.Total.Should().Be(transaction.Saldo);
+        statement.Saldo.Limite.Should().Be(transaction.Limite);
 
         statement.UltimasTransacoes.Should()
             .ContainEquivalentOf(

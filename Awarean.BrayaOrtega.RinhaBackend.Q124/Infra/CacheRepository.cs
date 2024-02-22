@@ -1,43 +1,50 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
+using Microsoft.Extensions.Caching.Distributed;
 using StackExchange.Redis;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 
 public sealed class CacheRepository : IDecoratedRepository
 {
-    private readonly ConnectionMultiplexer multiplexer;
+    private readonly IDistributedCache cache;
     private readonly IRepository next;
+    private static readonly JsonSerializerOptions options;
 
-    public CacheRepository(ConnectionMultiplexer multiplexer, IRepository next)
+    public CacheRepository(IDistributedCache cache, IRepository next)
     {
-        this.multiplexer = multiplexer ?? throw new ArgumentNullException(nameof(multiplexer));
+        this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
         this.next = next ?? throw new ArgumentNullException(nameof(next));
+    }
+
+    static CacheRepository()
+    {
+        options = new JsonSerializerOptions();
+        options.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
     }
 
     public async Task<Account> GetAccountByIdAsync(int id)
     {
-        var db = multiplexer.GetDatabase();
+        var saldo = -1;
+        var limite = -1;
+        var tasks = new List<Func<Task>>(){
+            async () => {
 
-        var accountValues = db.HashGetAll($"{AccountHashPrefix}{id}");
+                var bytes = await cache.GetAsync($"{AccountHashPrefix}{id}:{Saldo}");
+                saldo = BitConverter.ToInt32(bytes);
+            },
+            async () =>{
+                var bytes = await cache.GetAsync($"{AccountHashPrefix}{id}:{Limite}");
+                limite = BitConverter.ToInt32(bytes);
+            }
+        }.Select(x => x());
 
-        if (accountValues.Length == 0 || Array.TrueForAll(accountValues, x => x.Value.IsNullOrEmpty))
-        {
-            return await QueryAndSetCache(db, id);
-        }
+        await Task.WhenAll(tasks);
 
-        long limite = -1;
-        long saldo = -1;
-
-        foreach (var hash in accountValues)
-        {
-            if (hash.Name == Limite)
-                limite = long.Parse(hash.Value);
-            if (hash.Name == Saldo)
-                saldo = long.Parse(hash.Value);
-        }
-
-        if (limite is -1 && saldo is -1)
-            return await QueryAndSetCache(db, id);
+        if (saldo == -1 && limite == -1)
+            return await QueryAndSetCache(id);
 
         return new Account(id, limite, saldo);
     }
@@ -46,31 +53,43 @@ public sealed class CacheRepository : IDecoratedRepository
     private const string Saldo = nameof(Account.Saldo);
     private const string AccountHashPrefix = "Account:";
 
-    private async Task<Account> QueryAndSetCache(IDatabase db, int id)
+    private async Task<Account> QueryAndSetCache(int id)
     {
         var account = await next.GetAccountByIdAsync(id);
-        await SetCacheAsync(db, account);
+        await SetCacheAsync(account.Id, account.Limite, account.Saldo);
 
         return account;
     }
 
-    private static async Task SetCacheAsync(IDatabase db, Account account)
+    private async Task SetCacheAsync(int id, int limite, int saldo)
     {
-        await db.HashSetAsync($"{AccountHashPrefix}{account.Id}", [
-            new HashEntry(Limite, account.Limite),
-            new HashEntry(Saldo, account.Saldo)
-        ]);
+        var limiteBytes = BitConverter.GetBytes(limite);
+        var saldoBytes = BitConverter.GetBytes(saldo);
+
+        await Task.WhenAll(
+            cache.SetAsync($"{AccountHashPrefix}{id}:{Limite}", limiteBytes),
+            cache.SetAsync($"{AccountHashPrefix}{id}:{Saldo}", saldoBytes));
     }
 
+    static readonly DistributedCacheEntryOptions cacheOptions = new DistributedCacheEntryOptions() { AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(50) };
     public async Task<BankStatement> GetBankStatementAsync(int id)
     {
-        return await next.GetBankStatementAsync(id);
+        string key = $"bankStatement:{id}";
+        var statement = await cache.GetStringAsync(key);
+
+        BankStatement bankStatement = null;
+        if (string.IsNullOrEmpty(statement))
+        {
+            bankStatement = await next.GetBankStatementAsync(id);
+            var stringified = JsonSerializer.Serialize(bankStatement, options);
+            await cache.SetStringAsync(key, stringified, cacheOptions);
+        }
+
+        return bankStatement;
     }
 
-    public async Task Save(Account account, Transaction transaction)
+    public async Task Save(Transaction transaction)
     {
-        var db = multiplexer.GetDatabase();
-        await SetCacheAsync(db, account);
-        //await SetCacheAsync(db, transaction);
+        await SetCacheAsync(transaction.AccountId, transaction.Limite, transaction.Saldo);
     }
 }

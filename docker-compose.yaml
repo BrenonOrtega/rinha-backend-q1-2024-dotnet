@@ -18,8 +18,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.35"
-          memory: "120MB"
+          cpus: "0.3"
+          memory: "75MB"
 
   webapi2:
     <<: *api 
@@ -41,8 +41,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: "30MB"
+          cpus: "0.4"
+          memory: "50MB"
 
   cache:
     image: redis:alpine
@@ -52,14 +52,11 @@ services:
       - rinha_network
     environment:
       - REDIS_PASSWORD=redis
-      - REDIS_MAXMEMORY_POLICY=allkeys-lru
-      - REDIS_MAXMEMORY=1gb
-      - REDIS_MAXMEMORY_SAMPLES=5
     deploy:
       resources:
         limits:
           cpus: "0.2"
-          memory: "100MB"
+          memory: "40MB"
 
   postgres:
     image: postgres
@@ -78,7 +75,7 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "190MB"
+          memory: "200MB"
 
 networks:
   rinha_network:

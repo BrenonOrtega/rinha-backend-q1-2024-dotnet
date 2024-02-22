@@ -9,7 +9,7 @@ public sealed class AccountTests
 
     [Theory]
     [MemberData(nameof(InvalidTransactionsGenerator))]
-    public void Shouldnt_Allow_invalid_Transaction(long balance, TransactionRequest invalidTransaction)
+    public void Shouldnt_Allow_invalid_Transaction(int balance, TransactionRequest invalidTransaction)
     {
         var account = new Account(1, 10000, balance);
 
@@ -69,7 +69,7 @@ public sealed class AccountTests
         // "Debito que deixa a conta no limite"
         yield return [new TransactionRequest(2, 'd', "Debito")];
         //debito que deixa a conta 1 centavo antes do limite"
-        yield return [new TransactionRequest(1, 'd', "1c antes lim")];
+        yield return [new TransactionRequest(1, 'd', "limite -1")];
         //Descricao 10 characteres
         yield return [new TransactionRequest(3, 'd', "0123456789")];
     }

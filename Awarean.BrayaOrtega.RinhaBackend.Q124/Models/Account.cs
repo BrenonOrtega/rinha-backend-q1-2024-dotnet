@@ -1,15 +1,15 @@
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-public struct Account
+public sealed class Account
 {
-    public Account(long limite, long saldo)
+    public Account(int limite, int saldo)
         : this(default, limite, saldo)
     {
 
     }
 
-    public Account(int id, long limite, long saldo)
+    public Account(int id, int limite, int saldo)
     {
         Id = id;
         Limite = limite;
@@ -22,11 +22,11 @@ public struct Account
 
     public int Id { get; }
 
-    public long Limite { get; }
+    public int Limite { get; }
 
-    public long Saldo { get; private set;}
+    public int Saldo { get; private set;}
 
-    public readonly bool CanExecute(TransactionRequest transaction)
+    public bool CanExecute(TransactionRequest transaction)
     {
         var transactionType = transaction.Tipo;
 
@@ -38,26 +38,26 @@ public struct Account
 
         if (transactionType is Transaction.Debit)
         {
-            long remainingLimit = GetRemainingLimit();
+            int remainingLimit = GetRemainingLimit();
             return transaction.Valor <= remainingLimit;
         }
 
         return true;
     }
 
-    private readonly long GetRemainingLimit() => Limite + Saldo;
+    private int GetRemainingLimit() => Limite + Saldo;
 
     public Transaction Execute(TransactionRequest transaction)
     {
-        long valor = transaction.Valor;
+        int valor = transaction.Valor;
 
         if (transaction.Tipo is Transaction.Credit)
              Saldo += valor;
         else 
             Saldo -= valor;
 
-        return new Transaction(valor, transaction.Tipo, transaction.Descricao, Id);
+        return new Transaction(valor, transaction.Tipo, transaction.Descricao, Id, Limite, Saldo, DateTime.Now);
     }
 
-    internal readonly bool IsEmpty() => Id is 0 && Saldo is 0 && Limite is 0;
+    internal bool IsEmpty() => Id is 0 && Saldo is 0 && Limite is 0;
 }

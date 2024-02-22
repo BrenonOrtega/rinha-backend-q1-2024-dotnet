@@ -1,12 +1,11 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
 
-public sealed class TransactionRequest(long valor, char tipo, string descricao)
+public sealed class TransactionRequest(int valor, char tipo, string descricao)
 {
     [JsonPropertyName("valor")]
-    public long Valor { get; } = valor;
+    public int Valor { get; } = valor;
 
     [JsonPropertyName("tipo")]
     public char Tipo { get; } = tipo;

@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-public readonly struct BankStatement
+public sealed class BankStatement
 {
     public BankStatement(Balance saldo, List<BankStatementTransaction> ultimasTransacoes)
     {
@@ -21,5 +21,5 @@ public readonly struct BankStatement
     [JsonPropertyName("ultimas_transacoes")]
     public IList<BankStatementTransaction> UltimasTransacoes { get; } = [];
 
-    public bool IsEmpty() => Saldo.IsEmpty() && UltimasTransacoes.Count == 0;
+    public bool IsEmpty() => Saldo.IsEmpty();
 }

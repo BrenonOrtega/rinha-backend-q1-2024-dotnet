@@ -1,5 +1,9 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
+using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
+
 //using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra.CompiledModels;
 //using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -15,16 +19,26 @@ public static class ConfigurationExtensions
     {
         services.AddSingleton<NpgsqlDataSource>(x => new NpgsqlDataSourceBuilder(connectionString).Build());
 
+        services.AddScoped<IDecoratedRepository, CacheRepository>();
+        services.AddStackExchangeRedisCache(x =>
+        {
+            x.Configuration = cacheConnectionString;
+        });
+
         services.AddScoped<IRepository, Repository>();
 
-        services.AddSingleton(_ => ConnectionMultiplexer.Connect(cacheConnectionString, x =>
-        {
-            x.ConnectRetry = 5;
-            x.AsyncTimeout = 10000;
-            x.KeepAlive = 180;
-        }));
+        // services.AddSingleton(_ => ConnectionMultiplexer.ConnectAsync(cacheConnectionString, x =>
+        // {
+        //     x.ConnectRetry = 3;
+        //     x.AsyncTimeout = 30000;
+        //     x.SyncTimeout = 30000;
+        //     x.KeepAlive = 180;
+        //     x.IncludeDetailInExceptions = true;
+        //     x.AbortOnConnectFail = true;
+        // }).GetAwaiter().GetResult());
 
-        services.AddScoped<IDecoratedRepository, CacheRepository>();
+
+        services.AddSingleton(_ => new ConcurrentQueue<Transaction>());
 
         return services;
     }
