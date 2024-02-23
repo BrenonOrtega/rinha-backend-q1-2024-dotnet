@@ -7,7 +7,13 @@ services:
       context: .
       dockerfile: Dockerfile.Application
     environment:
+      - ASPNETCORE_URLS=http://+:8080;http://+:8081
       - ASPNETCORE_ENVIRONMENT=Production
+      - DOTNET_TieredPGO=1
+      - DOTNET_ReadyToRun=0
+      - DOTNET_TC_QuickJitForLoops=1
+      - NATS_DESTINATION=api02
+      - NATS_OWN=api01
     networks:
       - rinha_network
     ports:
@@ -18,19 +24,20 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: "75MB"
+          cpus: "0.35"
+          memory: "80MB"
 
   webapi2:
     <<: *api 
     hostname: webapi2
+    environment:
+      - NATS_DESTINATION=api01
+      - NATS_OWN=api02
     ports:
       - "5001:8080"
 
   load-balancer:
-    build:
-      context: .
-      dockerfile: Dockerfile.LoadBalancer
+    image: nginx:1.24.0-alpine
     networks:
       - rinha_network
     ports:
@@ -38,14 +45,16 @@ services:
     depends_on:
       - webapi1
       - webapi2
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     deploy:
       resources:
         limits:
-          cpus: "0.4"
-          memory: "50MB"
+          cpus: "0.3"
+          memory: "60MB"
 
   cache:
-    image: redis:alpine
+    image: redis:latest
     ports:
       - "6379:6379"
     networks:
@@ -55,7 +64,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
+          cpus: "0.1"
           memory: "40MB"
 
   postgres:
@@ -74,7 +83,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
+          cpus: "0.2"
           memory: "200MB"
 
 networks:

@@ -11,10 +11,6 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
 
 internal static class Program
 {
-    private const string BATCH_INSERT_TRANSACTION_COMMAND = @"INSERT INTO Transactions 
-                                    (AccountId, Limite, Saldo, RealizadaEm, Tipo, Valor)
-                                VALUES (@AccountId, @Limite, @Saldo, now(), @Tipo, @Valor);";
-
     private static readonly IResult NotFoundResponse = Results.NotFound();
     private static readonly IResult UnprocessableEntityResponse = Results.UnprocessableEntity();
     private static readonly IResult EmptyOkResponse = Results.Ok();
@@ -26,8 +22,6 @@ internal static class Program
         ConfigureBackgroundServices(builder);
 
         var app = builder.Build();
-
-        StartBackgroundServices(app);
 
         MapEndpoints(app);
 
@@ -46,7 +40,7 @@ internal static class Program
                     return Results.Ok(bankStatement);
 
                 return NotFoundResponse;
-            });
+            }).WithHttpLogging(Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.Response);
 
         app.MapPost("/clientes/{id:int}/transacoes", async (
             int id,
@@ -75,9 +69,8 @@ internal static class Program
 
             // Could be any number, just signals thread to process.
             channel.Writer.TryWrite(1);
-
             return EmptyOkResponse;
-        });
+        }).WithHttpLogging(Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestScheme);
     }
 
     private static WebApplicationBuilder ConfigureServices(string[] args)
@@ -103,71 +96,7 @@ internal static class Program
         builder.Services.AddSingleton(_ => Channel.CreateUnbounded<int>());
 
         builder.Services.AddSingleton<Repository>((p) => new Repository(p.GetRequiredService<NpgsqlDataSource>()));
-    }
 
-    private static void StartBackgroundServices(WebApplication app)
-    {
-        var thread = new Thread(async () =>
-        {
-            var scope = app.Services.CreateScope();
-
-            var channel = scope.ServiceProvider.GetRequiredService<Channel<int>>();
-            var pg = scope.ServiceProvider.GetRequiredService<NpgsqlDataSource>();
-            var queue = scope.ServiceProvider.GetRequiredService<ConcurrentQueue<Transaction>>();
-
-            var connOpened = false;
-            using var conn = pg.CreateConnection();
-            const int maxQueuedMessages = 100;
-            var transactions = new List<Transaction>(maxQueuedMessages);
-
-            while (true)
-            {
-                if (channel.Reader.TryRead(out var _))
-                {
-                    if (connOpened is false)
-                    {
-                        await conn.OpenAsync();
-                        connOpened = true;
-                    }
-
-                    while (queue.TryDequeue(out var queuedTransaction) && transactions.Count <= maxQueuedMessages)
-                    {
-                        transactions.Add(queuedTransaction);
-                    }
-
-                    if (transactions.Count <= maxQueuedMessages)
-                        continue;
-
-                    try
-                    {
-                        var batch = conn.CreateBatch();
-                        var commands = new List<NpgsqlBatchCommand>(queue.Count);
-                        foreach(var transaction in transactions)
-                        {
-                            var command = new NpgsqlBatchCommand(BATCH_INSERT_TRANSACTION_COMMAND);
-
-                            command.Parameters.AddWithValue("@AccountId", NpgsqlTypes.NpgsqlDbType.Integer, transaction.AccountId);
-                            command.Parameters.AddWithValue("@Limite", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Limite);
-                            command.Parameters.AddWithValue("@Saldo", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Saldo);
-                            command.Parameters.AddWithValue("@Tipo", NpgsqlTypes.NpgsqlDbType.Varchar, transaction.Tipo);
-                            command.Parameters.AddWithValue("@Valor", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Valor);
-                            command.Parameters.AddWithValue("@RealizadaEm", NpgsqlTypes.NpgsqlDbType.Date, transaction.RealizadaEm);
-
-                            batch.BatchCommands.Add(command);
-                        }
-
-                        await batch.ExecuteNonQueryAsync();
-                        transactions.Clear();
-                        Console.WriteLine($"Executed Batch Saving in database for {maxQueuedMessages} transactions.");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex.Message);
-                    }
-                }
-            }
-        });
-
-        thread.Start();
+        builder.Services.AddHostedService<SaveInBackgroundHostedService>();
     }
 }

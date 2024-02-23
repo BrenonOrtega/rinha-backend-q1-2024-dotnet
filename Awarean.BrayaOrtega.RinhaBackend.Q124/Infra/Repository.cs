@@ -65,7 +65,7 @@ public class Repository : IRepository
 
     public async Task<BankStatement> GetBankStatementAsync(int id)
     {
-        var sql = @$"SELECT Limite, Saldo, RealizadaEm, Valor, Tipo, Descricao
+        var sql = @$"SELECT Limite, Saldo, Descricao, RealizadaEm, Valor, Tipo 
             FROM Transactions
             WHERE AccountId = @Id
             ORDER BY RealizadaEm DESC
@@ -121,13 +121,16 @@ public class Repository : IRepository
         BankStatementTransaction transaction = null;
         try
         {
-            var realizadaEm = reader.IsDBNull(2) ? default : reader.GetDateTime(2);
+            var descricao = reader.IsDBNull("Descricao") ? null : reader.GetString(2);
+            if (descricao is null)
+                return null;
+
+            var realizadaEm = reader.IsDBNull(3) ? default : reader.GetDateTime(3);
             if (realizadaEm == default)
                 return transaction;
 
-            var valor = reader.GetInt32(3);
-            var tipo = reader.GetChar(4);
-            var descricao = reader.IsDBNull("Descricao") ? null : reader.GetString(5);
+            var valor = reader.GetInt32(4);
+            var tipo = reader.GetChar(5);
 
             transaction = new BankStatementTransaction(valor, tipo, descricao, realizadaEm);
         }

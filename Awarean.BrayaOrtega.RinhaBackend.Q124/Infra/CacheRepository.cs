@@ -33,11 +33,13 @@ public sealed class CacheRepository : IDecoratedRepository
             async () => {
 
                 var bytes = await cache.GetAsync($"{AccountHashPrefix}{id}:{Saldo}");
-                saldo = BitConverter.ToInt32(bytes);
+                if (bytes is not null)
+                    saldo = BitConverter.ToInt32(bytes);
             },
             async () =>{
                 var bytes = await cache.GetAsync($"{AccountHashPrefix}{id}:{Limite}");
-                limite = BitConverter.ToInt32(bytes);
+                if (bytes is not null)
+                    limite = BitConverter.ToInt32(bytes);
             }
         }.Select(x => x());
 
@@ -77,13 +79,17 @@ public sealed class CacheRepository : IDecoratedRepository
         string key = $"bankStatement:{id}";
         var statement = await cache.GetStringAsync(key);
 
-        BankStatement bankStatement = null;
+        BankStatement bankStatement;
         if (string.IsNullOrEmpty(statement))
         {
             bankStatement = await next.GetBankStatementAsync(id);
             var stringified = JsonSerializer.Serialize(bankStatement, options);
             await cache.SetStringAsync(key, stringified, cacheOptions);
+
+            return bankStatement;
         }
+
+        bankStatement = JsonSerializer.Deserialize<BankStatement>(statement, options);
 
         return bankStatement;
     }
