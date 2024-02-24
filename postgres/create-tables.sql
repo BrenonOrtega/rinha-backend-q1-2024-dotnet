@@ -11,3 +11,5 @@ CREATE TABLE IF NOT EXISTS Transactions (
 );
 
 CREATE INDEX idx_transactions_accountid ON Transactions (AccountId);
+
+CREATE INDEX idx_transactions_accountId_realizadaem ON Transactions (AccountId, RealizadaEm);
