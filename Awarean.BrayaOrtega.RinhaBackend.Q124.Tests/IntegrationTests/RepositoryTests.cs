@@ -9,7 +9,6 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 
 public sealed class RepositoryTests : IDisposable
 {
-    private readonly NpgsqlDataSource dataSource;
     private readonly IRepository repo;
 
     [Fact]
@@ -47,25 +46,15 @@ public sealed class RepositoryTests : IDisposable
     {
         const string connectionString = "Server=localhost;Port=5432;Database=rinha_database;User Id=postgres;Password=postgres;Include Error Detail=true;";
         const string redisString = "localhost:6379,password=redis,ssl=False";
-        
+
         var services = new ServiceCollection()
             .ConfigureInfrastructure(connectionString, redisString)
             .BuildServiceProvider();
 
-        dataSource = services.GetRequiredService<NpgsqlDataSource>();
         repo = services.GetRequiredService<IRepository>();
     }
 
     public void Dispose()
     {
-        using var conn = dataSource.CreateConnection();
-        using var command = new NpgsqlCommand(@"
-            BEGIN;
-            TRUNCATE TABLE Transactions;
-            COMMIT;", conn);
-
-        conn.Open();
-
-        command.ExecuteNonQuery();
     }
 }

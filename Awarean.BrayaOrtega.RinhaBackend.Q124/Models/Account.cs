@@ -1,14 +1,14 @@
 
+using System.Text.Json.Serialization;
+using MemoryPack;
+
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-public sealed class Account
+[MemoryPackable]
+public sealed partial class Account
 {
-    public Account(int limite, int saldo)
-        : this(default, limite, saldo)
-    {
-
-    }
-
+    [JsonConstructor]
+    [MemoryPackConstructor]
     public Account(int id, int limite, int saldo)
     {
         Id = id;
@@ -20,9 +20,9 @@ public sealed class Account
     {
     }
 
-    public int Id { get; }
+    public int Id { get; private set; }
 
-    public int Limite { get; }
+    public int Limite { get; private set;}
 
     public int Saldo { get; private set;}
 

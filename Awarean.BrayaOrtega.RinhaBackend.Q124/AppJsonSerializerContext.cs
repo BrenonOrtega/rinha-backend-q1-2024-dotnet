@@ -8,6 +8,7 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
 [JsonSerializable(typeof(BankStatement))]
 [JsonSerializable(typeof(Balance))]
 [JsonSerializable(typeof(BankStatementTransaction))]
+[JsonSerializable(typeof(Account))]
 internal partial class AppJsonSerializerContext : JsonSerializerContext
 {
 

@@ -1,17 +1,28 @@
 using System.Text.Json.Serialization;
+using MemoryPack;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
 
-public sealed class TransactionRequest(int valor, char tipo, string descricao)
+[MemoryPackable]
+public sealed partial class TransactionRequest
 {
+    [MemoryPackConstructor]
+    public TransactionRequest(int valor, char tipo, string descricao)
+    {
+        Valor = valor;
+        Tipo = tipo;
+        Descricao = descricao;
+    }
+
     [JsonPropertyName("valor")]
-    public int Valor { get; } = valor;
+    public int Valor { get; }
 
     [JsonPropertyName("tipo")]
-    public char Tipo { get; } = tipo;
+    public char Tipo { get; }
 
     [JsonPropertyName("descricao")]
-    public string Descricao { get; } = descricao;
+    public string Descricao { get; }
+
 
     public bool IsInvalid() 
         => Valor < 0 

@@ -7,17 +7,15 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
 
 public sealed class SaveInBackgroundHostedService : BackgroundService
 {
-    private readonly Channel<int> channel;
     private readonly NpgsqlDataSource pg;
     private readonly ConcurrentQueue<Transaction> queue;
-    private const string BATCH_INSERT_TRANSACTION_COMMAND = 
+    private const string BATCH_INSERT_TRANSACTION_COMMAND =
         @"INSERT INTO Transactions 
             (AccountId, Limite, Saldo, RealizadaEm, Tipo, Valor)
         VALUES (@AccountId, @Limite, @Saldo, @RealizadaEm, @Tipo, @Valor);";
-        
-    public SaveInBackgroundHostedService(Channel<int> channel, NpgsqlDataSource pg, ConcurrentQueue<Transaction> queue)
+
+    public SaveInBackgroundHostedService(NpgsqlDataSource pg, ConcurrentQueue<Transaction> queue)
     {
-        this.channel = channel ?? throw new ArgumentNullException(nameof(channel));
         this.pg = pg ?? throw new ArgumentNullException(nameof(pg));
         this.queue = queue ?? throw new ArgumentNullException(nameof(queue));
     }
@@ -25,12 +23,13 @@ public sealed class SaveInBackgroundHostedService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var thread = StartInThread(stoppingToken);
-        
-        while(true)
+
+        while (true)
         {
             if (stoppingToken.IsCancellationRequested)
                 thread.Join();
-            await Task.Delay(1000);
+            
+            await Task.Delay(1000,stoppingToken);
         }
     }
 
@@ -48,53 +47,53 @@ public sealed class SaveInBackgroundHostedService : BackgroundService
                 if (token.IsCancellationRequested)
                     break;
 
-                if (channel.Reader.TryRead(out var _)) 
+                while (queue.TryDequeue(out var queuedTransaction) && transactions.Count <= maxQueuedMessages)
                 {
-                    if (connOpened is false)
+                    transactions.Add(queuedTransaction);
+                }
+
+                if (transactions.Count <= maxQueuedMessages)
+                    continue;
+                
+                if (connOpened is false)
+                {
+                    await conn.OpenAsync();
+                    connOpened = true;
+                }
+
+                try
+                {
+                    var batch = conn.CreateBatch();
+                    var commands = new List<NpgsqlBatchCommand>(queue.Count);
+                    foreach (var transaction in transactions)
                     {
-                        await conn.OpenAsync();
-                        connOpened = true;
+                        var command = new NpgsqlBatchCommand(BATCH_INSERT_TRANSACTION_COMMAND);
+
+                        command.Parameters.AddWithValue("@AccountId", NpgsqlTypes.NpgsqlDbType.Integer, transaction.AccountId);
+                        command.Parameters.AddWithValue("@Limite", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Limite);
+                        command.Parameters.AddWithValue("@Saldo", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Saldo);
+                        command.Parameters.AddWithValue("@Tipo", NpgsqlTypes.NpgsqlDbType.Varchar, transaction.Tipo);
+                        command.Parameters.AddWithValue("@Valor", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Valor);
+                        command.Parameters.AddWithValue("@RealizadaEm", NpgsqlTypes.NpgsqlDbType.Date, transaction.RealizadaEm);
+
+                        batch.BatchCommands.Add(command);
                     }
 
-                    while (queue.TryDequeue(out var queuedTransaction) && transactions.Count <= maxQueuedMessages)
-                    {
-                        transactions.Add(queuedTransaction);
-                    }
-
-                    if (transactions.Count <= maxQueuedMessages)
-                        continue;
-
-                    try
-                    {
-                        var batch = conn.CreateBatch();
-                        var commands = new List<NpgsqlBatchCommand>(queue.Count);
-                        foreach(var transaction in transactions)
-                        {
-                            var command = new NpgsqlBatchCommand(BATCH_INSERT_TRANSACTION_COMMAND);
-
-                            command.Parameters.AddWithValue("@AccountId", NpgsqlTypes.NpgsqlDbType.Integer, transaction.AccountId);
-                            command.Parameters.AddWithValue("@Limite", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Limite);
-                            command.Parameters.AddWithValue("@Saldo", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Saldo);
-                            command.Parameters.AddWithValue("@Tipo", NpgsqlTypes.NpgsqlDbType.Varchar, transaction.Tipo);
-                            command.Parameters.AddWithValue("@Valor", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Valor);
-                            command.Parameters.AddWithValue("@RealizadaEm", NpgsqlTypes.NpgsqlDbType.Date, transaction.RealizadaEm);
-
-                            batch.BatchCommands.Add(command);
-                        }
-
-                        await batch.ExecuteNonQueryAsync();
-                        transactions.Clear();
-                        Console.WriteLine($"Executed Batch Saving in database for {maxQueuedMessages} transactions.");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex.Message);
-                    }
+                    await batch.ExecuteNonQueryAsync();
+                    transactions.Clear();
+                    Console.WriteLine($"Executed Batch Saving in database for {maxQueuedMessages} transactions.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
                 }
             }
 
             await conn.CloseAsync();
-        });
+        })
+        {
+            IsBackground = true
+        };;
 
         thread.Start();
 

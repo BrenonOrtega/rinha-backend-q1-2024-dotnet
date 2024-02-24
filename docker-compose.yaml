@@ -20,7 +20,7 @@ services:
       - "5000:8080"
     depends_on:
       - postgres
-      - cache
+      - messagequeue
     deploy:
       resources:
         limits:
@@ -53,19 +53,17 @@ services:
           cpus: "0.3"
           memory: "60MB"
 
-  cache:
-    image: redis:latest
-    ports:
-      - "6379:6379"
+  messagequeue:
+    image: nats:2.7.4
     networks:
       - rinha_network
-    environment:
-      - REDIS_PASSWORD=redis
+    ports:
+      - "4222:4222"
     deploy:
       resources:
         limits:
-          cpus: "0.1"
-          memory: "40MB"
+          cpus: "0.2"
+          memory: "30MB"
 
   postgres:
     image: postgres

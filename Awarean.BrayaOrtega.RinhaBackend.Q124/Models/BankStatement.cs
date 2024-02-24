@@ -1,9 +1,12 @@
 using System.Text.Json.Serialization;
+using MemoryPack;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-public sealed class BankStatement
+[MemoryPackable]
+public sealed partial class BankStatement
 {
+    [MemoryPackConstructor]
     public BankStatement(Balance saldo, List<BankStatementTransaction> ultimasTransacoes)
     {
         Saldo = saldo;

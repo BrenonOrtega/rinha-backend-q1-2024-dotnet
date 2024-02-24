@@ -1,11 +1,11 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using System.Threading.Channels;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
+using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Distributed;
-using Npgsql;
+using NATS.Client.Core;
+using ProtoBuf;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
 
@@ -19,8 +19,6 @@ internal static class Program
     {
         WebApplicationBuilder builder = ConfigureServices(args);
 
-        ConfigureBackgroundServices(builder);
-
         var app = builder.Build();
 
         MapEndpoints(app);
@@ -28,6 +26,27 @@ internal static class Program
         app.Run();
     }
 
+    private static WebApplicationBuilder ConfigureServices(string[] args)
+    {
+        var builder = WebApplication.CreateSlimBuilder(args);
+
+        builder.Services.ConfigureHttpJsonOptions(options =>
+        {
+            options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
+            options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        });
+
+        builder.Services.AddLogging(x => x.AddConsole());
+
+        builder.Services.ConfigureInfrastructure(
+            builder.Configuration.GetConnectionString("Postgres"));
+
+        builder.Services.ConfigureMessaging(builder.Configuration);
+
+        builder.Services.ConfigureBackgroundServices();
+
+        return builder;
+    }
 
     private static void MapEndpoints(WebApplication app)
     {
@@ -46,8 +65,9 @@ internal static class Program
             int id,
             [FromBody] TransactionRequest transaction,
             [FromServices] IDecoratedRepository repo,
-            [FromServices] Channel<int> channel,
             [FromServices] ConcurrentQueue<Transaction> queue,
+            [FromKeyedServices("NatsDestination")] string natsDestinationQueue,
+            [FromServices] INatsConnection connection,
             CancellationToken token) =>
         {
             if (transaction.IsInvalid())
@@ -64,39 +84,12 @@ internal static class Program
             var createdTransaction = account.Execute(transaction);
 
             await repo.Save(createdTransaction);
-            
+
+            await connection.PublishAsync(natsDestinationQueue, account, cancellationToken: token);
+
             queue.Enqueue(createdTransaction);
 
-            // Could be any number, just signals thread to process.
-            channel.Writer.TryWrite(1);
             return EmptyOkResponse;
         }).WithHttpLogging(Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestScheme);
-    }
-
-    private static WebApplicationBuilder ConfigureServices(string[] args)
-    {
-        var builder = WebApplication.CreateSlimBuilder(args);
-
-        builder.Services.ConfigureHttpJsonOptions(options =>
-        {
-            options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
-            options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        });
-
-        builder.Services.AddLogging();
-        builder.Services.ConfigureInfrastructure(
-            builder.Configuration.GetConnectionString("Postgres"),
-            builder.Configuration.GetConnectionString("Redis"));
-
-        return builder;
-    }
-
-    private static void ConfigureBackgroundServices(WebApplicationBuilder builder)
-    {
-        builder.Services.AddSingleton(_ => Channel.CreateUnbounded<int>());
-
-        builder.Services.AddSingleton<Repository>((p) => new Repository(p.GetRequiredService<NpgsqlDataSource>()));
-
-        builder.Services.AddHostedService<SaveInBackgroundHostedService>();
     }
 }

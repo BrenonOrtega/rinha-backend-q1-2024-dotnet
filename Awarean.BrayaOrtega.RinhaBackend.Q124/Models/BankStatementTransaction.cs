@@ -1,14 +1,25 @@
+using MemoryPack;
+
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-public sealed class BankStatementTransaction(int valor, char tipo, string descricao, DateTime realizadaEm)
+[MemoryPackable]
+public sealed partial class BankStatementTransaction
 {
-    public int Valor { get; } = valor;
+    [MemoryPackConstructor]
+    public BankStatementTransaction(int valor, char tipo, string descricao, DateTime realizadaEm)
+    {
+        Valor = valor;
+        Tipo = tipo;
+        Descricao = descricao;
+        RealizadaEm = realizadaEm;
+    }
+    public int Valor { get; }
 
-    public char Tipo { get; } = tipo;
+    public char Tipo { get; }
     
-    public string Descricao { get; } = descricao;
+    public string Descricao { get; }
     
-    public DateTime RealizadaEm { get; } = realizadaEm;
+    public DateTime RealizadaEm { get; }
 
     internal bool IsEmpty() => Descricao is null ||
             Valor == default

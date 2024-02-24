@@ -2,17 +2,16 @@
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 using Microsoft.Extensions.DependencyInjection;
-using StackExchange.Redis;
 using NSubstitute;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using FluentAssertions;
-using Microsoft.Extensions.Caching.Distributed;
+using System.Collections.Concurrent;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 
 public class CacheRepositoryTests : IDisposable
 {
-    private readonly IDistributedCache mtp;
+    private readonly ConcurrentDictionary<int,Account> cache;
     private readonly IRepository next;
     private readonly IRepository repo;
 
@@ -25,9 +24,9 @@ public class CacheRepositoryTests : IDisposable
             .ConfigureInfrastructure(connectionString, redisString)
             .BuildServiceProvider();
 
-        mtp = services.GetRequiredService<IDistributedCache>();
+        cache = services.GetRequiredService<ConcurrentDictionary<int,Account>>();
         next = Substitute.For<IRepository>();
-        repo = new CacheRepository(mtp, next);
+        repo = new CacheRepository(cache, next);
     }
 
     [Fact]
