@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile.Application
     environment:
-      - ASPNETCORE_URLS=http://+:8080;http://+:8081
+      - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Production
       - DOTNET_TieredPGO=1
       - DOTNET_ReadyToRun=0
@@ -18,7 +18,6 @@ services:
       - rinha_network
     ports:
       - "8080"
-      - "8081"
     depends_on:
       - postgres
       - messagequeue
