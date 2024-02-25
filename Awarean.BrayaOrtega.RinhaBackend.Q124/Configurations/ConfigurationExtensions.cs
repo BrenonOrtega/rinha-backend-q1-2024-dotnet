@@ -1,6 +1,9 @@
 using System.Text.Json;
+using System.Threading.Channels;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.KeyValueStore;
@@ -18,6 +21,18 @@ public static class ConfigurationExtensions
         var cacheConnectionString = configuration.GetConnectionString("Redis");
         services.AddSingleton<NpgsqlDataSource>(x => new NpgsqlDataSourceBuilder(connectionString).Build());
 
+        services.AddDbContextPool<RinhaBackendDbContext>(x =>
+        {
+            x.UseNpgsql(connectionString, opts =>
+            {
+                opts.EnableRetryOnFailure();
+            });
+            x.LogTo(Console.WriteLine);
+            x.EnableDetailedErrors();
+            x.EnableSensitiveDataLogging();
+            x.UseModel(RinhaBackendDbContextModel.Instance);
+        }, poolSize: 1024);
+
         services.AddScoped<IDecoratedRepository, CacheRepository>();
         services.AddStackExchangeRedisCache(x =>
         {
@@ -32,6 +47,12 @@ public static class ConfigurationExtensions
     }
 
     public static IServiceCollection ConfigureMessaging(this IServiceCollection services, IConfiguration config)
+    {
+        services.AddSingleton<Channel<int>>(_ => Channel.CreateUnbounded<int>());
+        return ConfigureNats(services, config);
+    }
+
+    private static IServiceCollection ConfigureNats(IServiceCollection services, IConfiguration config)
     {
         string natsConnectionString = config.GetConnectionString("Nats");
         string natsDestinationQueue = config["NATS_DESTINATION"];
@@ -55,10 +76,7 @@ public static class ConfigurationExtensions
             var ctx = new NatsKVContext(js);
 
             var store = ctx.CreateStoreAsync(nameof(Account));
-            while (store.IsCompleted is false)
-            {
-
-            }
+            while (store.IsCompleted is false) { }
 
             return store.Result;
         });
@@ -68,8 +86,6 @@ public static class ConfigurationExtensions
 
     public static IServiceCollection ConfigureBackgroundServices(this IServiceCollection services)
     {
-        services.AddKeyedSingleton<Repository>("singleton repo", (p, _) => new Repository(p.GetRequiredService<NpgsqlDataSource>()));
-
         services.AddHostedService<SaveInBackgroundHostedService>();
 
         return services;

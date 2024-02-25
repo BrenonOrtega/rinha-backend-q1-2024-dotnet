@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Threading.Channels;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 using Microsoft.AspNetCore.Mvc;
@@ -51,8 +52,9 @@ public class Program
             [FromServices] IDecoratedRepository repo,
             [FromKeyedServices("NatsDestination")] string natsDestinationQueue,
             [FromServices] INatsConnection connection,
+            [FromServices] Channel<int> channel,
             CancellationToken token) 
-                => Endpoints.MakeTransactionAsync(id, transaction, repo, natsDestinationQueue, connection, token))
+                => Endpoints.MakeTransactionAsync(id, transaction, repo, natsDestinationQueue, connection, channel, token))
                 .WithHttpLogging(Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestScheme);
     }
 }

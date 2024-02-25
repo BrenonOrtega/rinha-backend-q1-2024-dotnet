@@ -22,9 +22,11 @@ public sealed partial class Account
 
     public int Id { get; private set; }
 
-    public int Limite { get; private set;}
+    public int Limite { get; private set; }
 
-    public int Saldo { get; private set;}
+    public int Saldo { get; private set; }
+
+    public List<Transaction> Transactions { get; set; }
 
     public bool CanExecute(TransactionRequest transaction)
     {
@@ -34,7 +36,7 @@ public sealed partial class Account
             return false;
 
         if (transaction.Descricao is null or { Length: 0 or > 10 })
-            return false; 
+            return false;
 
         if (transactionType is Transaction.Debit)
         {
@@ -52,8 +54,8 @@ public sealed partial class Account
         int valor = transaction.Valor;
 
         if (transaction.Tipo is Transaction.Credit)
-             Saldo += valor;
-        else 
+            Saldo += valor;
+        else
             Saldo -= valor;
 
         return new Transaction(valor, transaction.Tipo, transaction.Descricao, Id, Limite, Saldo, DateTime.Now);

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 using Microsoft.AspNetCore.Mvc;
 using NATS.Client.Core;
@@ -18,6 +19,7 @@ public static class Endpoints
             [FromServices] IRepository repo,
             [FromKeyedServices("NatsDestination")] string natsDestinationQueue,
             [FromServices] INatsConnection connection,
+            Channel<int> channel,
             CancellationToken token)
     {
         if (request.IsInvalid())
@@ -25,7 +27,7 @@ public static class Endpoints
 
         var account = await repo.GetAccountByIdAsync(id);
 
-        if (account.IsEmpty())
+        if (account is null || account.IsEmpty())
             return NotFoundResponse;
 
         if (account.CanExecute(request) is false)
@@ -37,10 +39,12 @@ public static class Endpoints
 
         await connection.PublishAsync<Transaction>(
             natsDestinationQueue,
-            createdTransaction, 
+            createdTransaction,
             cancellationToken: token);
 
-        return EmptyOkResponse;
+        channel.Writer.TryWrite(default);
+
+        return Results.Ok(new TransactionResponse(account.Limite, account.Saldo));
     }
 
     public static async Task<IResult> GetBankStatementAsync(int id, [FromServices] IDecoratedRepository repo)

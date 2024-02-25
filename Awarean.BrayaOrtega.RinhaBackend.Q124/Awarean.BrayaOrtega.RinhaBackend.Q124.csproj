@@ -10,17 +10,21 @@
     <DockerfileContext>.</DockerfileContext>
     <OptimizationPreference>Speed</OptimizationPreference>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <PublishAot>true</PublishAot>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="MemoryPack" Version="1.10.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.2" />
     <PackageReference Include="NATS.Client.JetStream" Version="2.1.1" />
     <PackageReference Include="NATS.Client.KeyValueStore" Version="2.1.1" />
     <PackageReference Include="NATS.Client.Serializers.Json" Version="2.1.1" />
     <PackageReference Include="Nats.Net" Version="2.1.1" />
     <PackageReference Include="Npgsql" Version="8.0.2" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.Postgresql" Version="8.0.2" />
     <PackageReference Include="protobuf-net" Version="3.2.30" />
     <PackageReference Include="StackExchange.Redis" Version="2.7.20" />
   </ItemGroup>
