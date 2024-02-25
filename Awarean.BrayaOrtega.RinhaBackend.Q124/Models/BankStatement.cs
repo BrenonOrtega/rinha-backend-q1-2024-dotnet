@@ -22,7 +22,7 @@ public sealed partial class BankStatement
     public Balance Saldo { get; }
 
     [JsonPropertyName("ultimas_transacoes")]
-    public IList<BankStatementTransaction> UltimasTransacoes { get; } = [];
+    public List<BankStatementTransaction> UltimasTransacoes { get; } = [];
 
     public bool IsEmpty() => Saldo.IsEmpty();
 }

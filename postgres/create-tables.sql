@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS Transactions (
     Id SERIAL PRIMARY KEY,
     AccountId INT NOT NULL,
-    Descricao VARCHAR(10),
+    Descricao VARCHAR(10) NOT NULL,
     Tipo CHAR(1) NOT NULL,
     Valor INTEGER NOT NULL,
     Saldo INTEGER NOT NULL,

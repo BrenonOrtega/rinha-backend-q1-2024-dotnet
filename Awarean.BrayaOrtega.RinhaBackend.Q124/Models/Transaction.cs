@@ -1,13 +1,15 @@
-using ProtoBuf;
+using System.Text.Json.Serialization;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
 
-public sealed class Transaction
+public class Transaction
 {
     public const char Credit = 'c';
     public const char Debit = 'd';
 
-    public Transaction(int valor, char tipo, string descricao, int accountId, int limite, int saldo, DateTime realizadaEm)
+    [JsonConstructor]
+    public Transaction(int valor, char tipo, string descricao, int accountId,
+        int limite, int saldo, DateTime realizadaEm)
     {
         Valor = valor;
         Tipo = tipo;
@@ -17,6 +19,7 @@ public sealed class Transaction
         Saldo = saldo;
         RealizadaEm = realizadaEm;
     }
+
 
     public int Valor { get; }
 

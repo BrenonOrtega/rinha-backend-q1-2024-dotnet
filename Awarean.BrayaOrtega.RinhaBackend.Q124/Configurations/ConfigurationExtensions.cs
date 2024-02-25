@@ -1,32 +1,32 @@
-using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
-using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
 using NATS.Client.Core;
-
-
-
-//using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra.CompiledModels;
-//using Microsoft.EntityFrameworkCore;
+using NATS.Client.JetStream;
+using NATS.Client.KeyValueStore;
+using NATS.Client.Serializers.Json;
 using Npgsql;
-using StackExchange.Redis;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 
 public static class ConfigurationExtensions
 {
     public static IServiceCollection ConfigureInfrastructure(this IServiceCollection services,
-     string connectionString)
+     IConfiguration configuration)
     {
+        var connectionString = configuration.GetConnectionString("Postgres");
+        var cacheConnectionString = configuration.GetConnectionString("Redis");
         services.AddSingleton<NpgsqlDataSource>(x => new NpgsqlDataSourceBuilder(connectionString).Build());
+
+        services.AddScoped<IDecoratedRepository, CacheRepository>();
+        services.AddStackExchangeRedisCache(x =>
+        {
+            x.Configuration = cacheConnectionString;
+        });
 
         services.AddScoped<IDecoratedRepository, CacheRepository>();
 
         services.AddScoped<IRepository, Repository>();
-
-        services.AddSingleton(_ => new ConcurrentQueue<Transaction>());
 
         return services;
     }
@@ -48,17 +48,29 @@ public static class ConfigurationExtensions
         };
 
         services.AddSingleton<INatsConnection>(_ => new NatsConnection(opts));
+        services.AddSingleton<INatsKVStore>(provider =>
+        {
+            var conn = provider.GetRequiredService<INatsConnection>();
+            var js = new NatsJSContext((NatsConnection)conn);
+            var ctx = new NatsKVContext(js);
+
+            var store = ctx.CreateStoreAsync(nameof(Account));
+            while (store.IsCompleted is false)
+            {
+
+            }
+
+            return store.Result;
+        });
 
         return services;
     }
 
     public static IServiceCollection ConfigureBackgroundServices(this IServiceCollection services)
     {
-        services.AddSingleton<Repository>((p) => new Repository(p.GetRequiredService<NpgsqlDataSource>()));
+        services.AddKeyedSingleton<Repository>("singleton repo", (p, _) => new Repository(p.GetRequiredService<NpgsqlDataSource>()));
 
-        services.AddSingleton<ConcurrentDictionary<int, Account>>(_ => new());
         services.AddHostedService<SaveInBackgroundHostedService>();
-        services.AddHostedService<SynchronizeAccountsHostedService>();
 
         return services;
     }

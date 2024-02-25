@@ -17,7 +17,8 @@ services:
     networks:
       - rinha_network
     ports:
-      - "5000:8080"
+      - "8080"
+      - "8081"
     depends_on:
       - postgres
       - messagequeue
@@ -25,7 +26,7 @@ services:
       resources:
         limits:
           cpus: "0.35"
-          memory: "80MB"
+          memory: "50MB"
 
   webapi2:
     <<: *api 
@@ -34,7 +35,8 @@ services:
       - NATS_DESTINATION=api01
       - NATS_OWN=api02
     ports:
-      - "5001:8080"
+      - "8080"
+      - "8081"
 
   load-balancer:
     image: nginx:1.24.0-alpine
@@ -50,8 +52,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: "60MB"
+          cpus: "0.2"
+          memory: "50MB"
 
   messagequeue:
     image: nats:2.7.4
@@ -59,12 +61,27 @@ services:
       - rinha_network
     ports:
       - "4222:4222"
+    command: -js
+    deploy:
+      resources:
+        limits:
+          cpus: "0.15"
+          memory: "30MB"
+
+  cache:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - rinha_network
+    environment:
+      - REDIS_PASSWORD=redis
     deploy:
       resources:
         limits:
           cpus: "0.2"
-          memory: "30MB"
-
+          memory: "40MB"
+          
   postgres:
     image: postgres
     restart: always
@@ -76,13 +93,19 @@ services:
       - rinha_network
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     volumes:
       - ./postgres:/docker-entrypoint-initdb.d
+    command: [ "postgres", "-c", "config_file=/docker-entrypoint-initdb.d/postgres.conf" ]
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: "200MB"
+          cpus: "0.5"
+          memory: "350MB"
 
 networks:
   rinha_network:

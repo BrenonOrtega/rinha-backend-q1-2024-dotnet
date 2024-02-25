@@ -4,6 +4,7 @@ using Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using FluentAssertions;
 using Npgsql;
+using Microsoft.Extensions.Configuration;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 
@@ -46,9 +47,14 @@ public sealed class RepositoryTests : IDisposable
     {
         const string connectionString = "Server=localhost;Port=5432;Database=rinha_database;User Id=postgres;Password=postgres;Include Error Detail=true;";
         const string redisString = "localhost:6379,password=redis,ssl=False";
-
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection([
+                new ("ConnectionStrings:Postgres", connectionString),
+                new("ConnectionStrings:Redis", redisString),
+            ])
+            .Build();
         var services = new ServiceCollection()
-            .ConfigureInfrastructure(connectionString, redisString)
+            .ConfigureInfrastructure(config)
             .BuildServiceProvider();
 
         repo = services.GetRequiredService<IRepository>();

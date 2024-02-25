@@ -21,9 +21,8 @@ public class Repository : IRepository
                     ORDER BY RealizadaEm
                     LIMIT 1;";
 
-        using var conn = dataSource.CreateConnection();
+        using var conn = await dataSource.OpenConnectionAsync();
 
-        await conn.OpenAsync();
         try
         {
             var account = await ReadAccountAsync(conn, sql, id);
@@ -34,6 +33,7 @@ public class Repository : IRepository
             Console.WriteLine($"{nameof(GetBankStatementAsync)}: {ex.Message}");
             throw;
         }
+
         finally
         {
             await conn.CloseAsync();
@@ -53,12 +53,8 @@ public class Repository : IRepository
             var limite = reader.GetInt32(0);
             var saldo = reader.GetInt32(1);
 
-            await conn.CloseAsync();
-
             return new Account(accountId, limite, saldo);
         }
-
-        await conn.CloseAsync();
 
         return new Account();
     }
@@ -71,12 +67,10 @@ public class Repository : IRepository
             ORDER BY RealizadaEm DESC
             LIMIT 10;";
 
-        using var conn = dataSource.CreateConnection();
+        using var conn = await dataSource.OpenConnectionAsync();
 
         using var command = new NpgsqlCommand(sql, conn);
         command.Parameters.AddWithValue("@Id", id);
-
-        await conn.OpenAsync();
 
         try
         {
@@ -138,6 +132,7 @@ public class Repository : IRepository
         {
             Console.WriteLine(ex.Message);
         }
+        
 
         return transaction;
     }
@@ -159,9 +154,9 @@ public class Repository : IRepository
     {
         var sql = @"INSERT INTO Transactions 
                             (Tipo, Valor, Descricao, RealizadaEm, Limite, Saldo, AccountId)
-                    VALUES (@Tipo, @Valor, @Descricao, now(), @Limite, @Saldo, @Id);";
+                    VALUES (@Tipo, @Valor, @Descricao, @RealizadaEm, @Limite, @Saldo, @Id);";
 
-        using var conn = dataSource.CreateConnection();
+        using var conn = await dataSource.OpenConnectionAsync();
 
         var command = conn.CreateCommand();
 
@@ -169,11 +164,10 @@ public class Repository : IRepository
         command.Parameters.AddWithValue("@Id", NpgsqlDbType.Integer, transaction.AccountId);
         command.Parameters.AddWithValue("@Limite", NpgsqlDbType.Bigint, transaction.Limite);
         command.Parameters.AddWithValue("@Saldo", NpgsqlDbType.Bigint, transaction.Saldo);
-        command.Parameters.AddWithValue("@Tipo", NpgsqlDbType.Varchar, transaction.Tipo);
+        command.Parameters.AddWithValue("@Tipo", NpgsqlDbType.Varchar, size: 1, transaction.Tipo);
         command.Parameters.AddWithValue("@Valor", NpgsqlDbType.Bigint, transaction.Valor);
         command.Parameters.AddWithValue("@Descricao", NpgsqlDbType.Varchar, transaction.Descricao);
-
-        await conn.OpenAsync();
+        command.Parameters.AddWithValue("@RealizadaEm", NpgsqlDbType.Date, transaction.RealizadaEm);
 
         try
         {

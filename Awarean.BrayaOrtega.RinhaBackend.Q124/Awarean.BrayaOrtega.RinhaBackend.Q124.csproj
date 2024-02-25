@@ -16,6 +16,8 @@
   <ItemGroup>
     <PackageReference Include="MemoryPack" Version="1.10.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.2" />
+    <PackageReference Include="NATS.Client.JetStream" Version="2.1.1" />
+    <PackageReference Include="NATS.Client.KeyValueStore" Version="2.1.1" />
     <PackageReference Include="NATS.Client.Serializers.Json" Version="2.1.1" />
     <PackageReference Include="Nats.Net" Version="2.1.1" />
     <PackageReference Include="Npgsql" Version="8.0.2" />
