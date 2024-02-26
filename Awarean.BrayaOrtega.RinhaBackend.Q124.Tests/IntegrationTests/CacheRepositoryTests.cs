@@ -8,6 +8,7 @@ using FluentAssertions;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Caching.Distributed;
+using StackExchange.Redis;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 
@@ -30,7 +31,7 @@ public class CacheRepositoryTests : IDisposable
             .ConfigureInfrastructure(config)
             .BuildServiceProvider();
 
-        var cache = services.GetRequiredService<IDistributedCache>();
+        var cache = services.GetRequiredService<ConnectionMultiplexer>();
         next = Substitute.For<IRepository>();
         repo = new CacheRepository(cache, next);
     }

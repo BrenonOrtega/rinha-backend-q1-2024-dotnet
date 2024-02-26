@@ -1,11 +1,11 @@
-using System.Text.Json;
+using System.Threading.Channels;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.KeyValueStore;
-using NATS.Client.Serializers.Json;
 using Npgsql;
+using StackExchange.Redis;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 
@@ -24,6 +24,13 @@ public static class ConfigurationExtensions
             x.Configuration = cacheConnectionString;
         });
 
+        services.AddSingleton(_ => ConnectionMultiplexer.Connect(cacheConnectionString, x =>
+        {
+            x.ConnectRetry = 5;
+            x.AsyncTimeout = 10000;
+            x.KeepAlive = 180;
+        }));
+
         services.AddScoped<IDecoratedRepository, CacheRepository>();
 
         services.AddScoped<IRepository, Repository>();
@@ -32,6 +39,12 @@ public static class ConfigurationExtensions
     }
 
     public static IServiceCollection ConfigureMessaging(this IServiceCollection services, IConfiguration config)
+    {
+        services.AddSingleton<Channel<int>>(_ => Channel.CreateUnbounded<int>());
+        return ConfigureNats(services, config);
+    }
+
+    private static IServiceCollection ConfigureNats(IServiceCollection services, IConfiguration config)
     {
         string natsConnectionString = config.GetConnectionString("Nats");
         string natsDestinationQueue = config["NATS_DESTINATION"];
@@ -55,10 +68,7 @@ public static class ConfigurationExtensions
             var ctx = new NatsKVContext(js);
 
             var store = ctx.CreateStoreAsync(nameof(Account));
-            while (store.IsCompleted is false)
-            {
-
-            }
+            while (store.IsCompleted is false) { }
 
             return store.Result;
         });
@@ -68,8 +78,6 @@ public static class ConfigurationExtensions
 
     public static IServiceCollection ConfigureBackgroundServices(this IServiceCollection services)
     {
-        services.AddKeyedSingleton<Repository>("singleton repo", (p, _) => new Repository(p.GetRequiredService<NpgsqlDataSource>()));
-
         services.AddHostedService<SaveInBackgroundHostedService>();
 
         return services;

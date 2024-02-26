@@ -1,7 +1,6 @@
-using System.Diagnostics.Metrics;
-using System.Timers;
+using System.Collections.Concurrent;
+using System.Threading.Channels;
 using NATS.Client.Core;
-using NATS.Client.Serializers.Json;
 using Npgsql;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
@@ -10,56 +9,78 @@ public sealed class SaveInBackgroundHostedService : BackgroundService
 {
     private readonly NpgsqlDataSource pg;
     private readonly INatsConnection nats;
+    private readonly Channel<int> channel;
     private const string BATCH_INSERT_TRANSACTION_COMMAND =
         @"INSERT INTO Transactions 
-            (AccountId, Limite, Saldo, RealizadaEm, Tipo, Valor)
-        VALUES (@AccountId, @Limite, @Saldo, @RealizadaEm, @Tipo, @Valor);";
+            (AccountId, Limite, Saldo, RealizadaEm, Tipo, Valor, Descricao)
+        VALUES (@AccountId, @Limite, @Saldo, @RealizadaEm, @Tipo, @Valor, @Descricao);";
 
-    public SaveInBackgroundHostedService(NpgsqlDataSource pg, INatsConnection nats)
+    public SaveInBackgroundHostedService(NpgsqlDataSource pg, INatsConnection nats, Channel<int> channel)
     {
         this.pg = pg ?? throw new ArgumentNullException(nameof(pg));
         this.nats = nats ?? throw new ArgumentNullException(nameof(nats));
+        this.channel = channel;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        //var thread = StartInThread(stoppingToken);
+        StartInThread(stoppingToken);
 
-        while (true)
-        {
-            await Execute(stoppingToken);
-
-            await Task.Delay(1000, stoppingToken);
-        }
+        return Task.CompletedTask;
     }
 
-    private Thread StartInThread(CancellationToken token)
+    private void StartInThread(CancellationToken token)
     {
-        var thread = new Thread(async () =>
+        var receiveFromBusThread = new Thread(async () =>
         {
-            using NpgsqlConnection conn = await Execute(token);
+            await StartReceivingMessagesAsync(token);
         })
         {
             IsBackground = true
-        }; ;
+        };
 
-        thread.Start();
+        var saveInDatabaseThread = new Thread(async () =>
+        {
+            await SaveTransactionsToDatabaseAsync(token);
+        })
+        {
+            IsBackground = true
+        };
 
-        return thread;
+        receiveFromBusThread.Start();
+        saveInDatabaseThread.Start();
     }
 
-    private bool shouldSendMessages = false;
-    private void MarkToSendMessages(object _, ElapsedEventArgs __) => shouldSendMessages = true;
-    const int maxQueuedMessages = 100;
-    readonly List<Transaction> transactions = new(maxQueuedMessages);
-
-    private async Task<NpgsqlConnection> Execute(CancellationToken token)
+    private async Task SaveTransactionsToDatabaseAsync(CancellationToken token)
     {
-        using NpgsqlConnection conn = await GetConnectionAsync();
+        var start = DateTime.Now;
+        var conn = await GetConnectionAsync();
+
+        while (token.IsCancellationRequested is false)
+        {
+            if (transactions.IsEmpty && !channel.Reader.TryRead(out _))
+                continue;
+
+            var elapsed = DateTime.Now - start;
+            if (transactions.Count >= maxQueuedMessages || elapsed >= TimeSpan.FromSeconds(3))
+            {
+                await SendTransactionsAsync(conn);
+                start = DateTime.Now;
+            }
+        }
+
+        await conn.CloseAsync();
+        Console.WriteLine("Existing saveInDatabaseThread");
+    }
+
+    const int maxQueuedMessages = 100;
+    readonly ConcurrentQueue<Transaction> transactions = new ConcurrentQueue<Transaction>();
+
+    private async Task StartReceivingMessagesAsync(CancellationToken token)
+    {
         var subs = nats.SubscribeAsync<Transaction>(nameof(Transaction));
 
-        var start = DateTime.Now;
-        while (true)
+        while (token.IsCancellationRequested is false)
         {
             if (token.IsCancellationRequested)
                 break;
@@ -67,22 +88,12 @@ public sealed class SaveInBackgroundHostedService : BackgroundService
             await foreach (var msg in subs)
             {
                 var queuedTransaction = msg.Data;
-                if (transactions.Count <= maxQueuedMessages)
+                lock (transactions)
                 {
-                    transactions.Add(queuedTransaction);
-                }
-
-                var elapsed = DateTime.Now - start;
-                if (transactions.Count >= maxQueuedMessages || elapsed >= TimeSpan.FromSeconds(3))
-                {
-                    await SendTransactionsAsync(conn);
-                    start = DateTime.Now;
+                    transactions.Enqueue(queuedTransaction);
                 }
             }
         }
-
-        await conn.CloseAsync();
-        return conn;
     }
 
     private async Task<NpgsqlConnection> GetConnectionAsync()
@@ -100,19 +111,27 @@ public sealed class SaveInBackgroundHostedService : BackgroundService
 
     private async Task SendTransactionsAsync(NpgsqlConnection conn)
     {
-        if (transactions.Count == 0)
+        if (transactions.IsEmpty)
         {
             Console.WriteLine("No Transactions to send.");
             return;
         }
 
-        Transaction[] transactionsToSave = new Transaction[transactions.Count];
-        transactions.CopyTo(transactionsToSave);
+        List<Transaction> transactionsToSave = new List<Transaction>(transactions.Count);
+        lock (transactions)
+        {
+            while (transactions.TryDequeue(out var t))
+            {
+                transactionsToSave.Add(t);
+            }
+            
+            transactions.Clear();
+        }
 
         try
         {
             var batch = conn.CreateBatch();
-            var commands = new List<NpgsqlBatchCommand>(transactionsToSave.Length);
+            var commands = new List<NpgsqlBatchCommand>(transactionsToSave.Count);
             foreach (var transaction in transactionsToSave)
             {
                 var command = new NpgsqlBatchCommand(BATCH_INSERT_TRANSACTION_COMMAND);
@@ -122,7 +141,7 @@ public sealed class SaveInBackgroundHostedService : BackgroundService
                 command.Parameters.AddWithValue("@Saldo", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Saldo);
                 command.Parameters.AddWithValue("@Tipo", NpgsqlTypes.NpgsqlDbType.Varchar, transaction.Tipo);
                 command.Parameters.AddWithValue("@Valor", NpgsqlTypes.NpgsqlDbType.Numeric, transaction.Valor);
-                command.Parameters.AddWithValue("@RealizadaEm", NpgsqlTypes.NpgsqlDbType.Date, transaction.RealizadaEm);
+                command.Parameters.AddWithValue("@RealizadaEm", NpgsqlTypes.NpgsqlDbType.Timestamp, transaction.RealizadaEm);
                 command.Parameters.AddWithValue("@Descricao", NpgsqlTypes.NpgsqlDbType.Varchar, transaction.Descricao);
 
                 batch.BatchCommands.Add(command);
@@ -130,7 +149,7 @@ public sealed class SaveInBackgroundHostedService : BackgroundService
 
             await batch.ExecuteNonQueryAsync();
             transactions.Clear();
-            Console.WriteLine($"Executed Batch Saving in database for {transactionsToSave.Length} transactions.");
+            Console.WriteLine($"Executed Batch Saving in database for {transactionsToSave.Count} transactions.");
         }
         catch (Exception ex)
         {

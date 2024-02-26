@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using MemoryPack;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
@@ -19,6 +20,7 @@ public sealed partial class BankStatementTransaction
     
     public string Descricao { get; }
     
+    [JsonPropertyName("realizada_em")]
     public DateTime RealizadaEm { get; }
 
     internal bool IsEmpty() => Descricao is null ||
