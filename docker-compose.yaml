@@ -24,8 +24,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.4"
-          memory: "70MB"
+          cpus: "0.25"
+          memory: "50MB"
 
   webapi2:
     <<: *api 
@@ -100,7 +100,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
+          cpus: "0.15"
           memory: "200MB"
 
 networks:

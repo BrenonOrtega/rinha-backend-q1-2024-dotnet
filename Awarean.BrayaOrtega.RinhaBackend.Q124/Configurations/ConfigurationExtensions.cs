@@ -22,7 +22,8 @@ public static class ConfigurationExtensions
 
         services.AddSingleton(_ => ConnectionMultiplexer.Connect(cacheConnectionString, x =>
         {
-            x.ConnectRetry = 5;
+            x.ConnectRetry = 10;
+            
             x.AsyncTimeout = 10000;
             x.KeepAlive = 180;
         }));
