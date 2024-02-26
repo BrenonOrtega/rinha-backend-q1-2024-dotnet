@@ -1,12 +1,9 @@
 using System.Text.Json.Serialization;
-using MemoryPack;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-[MemoryPackable]
 public sealed partial class Balance
 {
-    [MemoryPackConstructor]
     public Balance(int total, int limite)
     {
         Total = total;

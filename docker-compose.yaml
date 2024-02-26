@@ -7,36 +7,32 @@ services:
       context: .
       dockerfile: Dockerfile.Application
     environment:
-      - ASPNETCORE_URLS=http://+:8080;http://+:8081
+      - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Production
       - DOTNET_TieredPGO=1
       - DOTNET_ReadyToRun=0
       - DOTNET_TC_QuickJitForLoops=1
-      - NATS_DESTINATION=api02
-      - NATS_OWN=api01
+      - NATS_DESTINATION=Transaction
+      - NATS_OWN=Transaction
     networks:
       - rinha_network
     ports:
       - "8080"
-      - "8081"
     depends_on:
       - postgres
       - messagequeue
     deploy:
       resources:
         limits:
-          cpus: "0.35"
-          memory: "50MB"
+          cpus: "0.4"
+          memory: "70MB"
 
   webapi2:
     <<: *api 
     hostname: webapi2
     environment:
-      - NATS_DESTINATION=api01
-      - NATS_OWN=api02
-    ports:
-      - "8080"
-      - "8081"
+      - NATS_DESTINATION=Transaction
+      - NATS_OWN=Transaction
 
   load-balancer:
     image: nginx:1.24.0-alpine
@@ -66,7 +62,7 @@ services:
       resources:
         limits:
           cpus: "0.15"
-          memory: "30MB"
+          memory: "25MB"
 
   cache:
     image: redis:alpine
@@ -79,8 +75,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: "40MB"
+          cpus: "0.15"
+          memory: "25MB"
           
   postgres:
     image: postgres
@@ -104,8 +100,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: "350MB"
+          cpus: "0.3"
+          memory: "200MB"
 
 networks:
   rinha_network:

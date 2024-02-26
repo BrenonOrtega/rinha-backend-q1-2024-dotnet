@@ -1,14 +1,10 @@
-
 using System.Text.Json.Serialization;
-using MemoryPack;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-[MemoryPackable]
 public sealed partial class Account
 {
     [JsonConstructor]
-    [MemoryPackConstructor]
     public Account(int id, int limite, int saldo)
     {
         Id = id;

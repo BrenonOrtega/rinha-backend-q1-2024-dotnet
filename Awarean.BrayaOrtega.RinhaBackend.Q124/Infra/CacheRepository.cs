@@ -1,5 +1,5 @@
+using System.Text.Json;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
-using MemoryPack;
 using StackExchange.Redis;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
@@ -13,11 +13,18 @@ public sealed class CacheRepository : IDecoratedRepository
 
     private readonly ConnectionMultiplexer multiplexer;
     private readonly IRepository next;
+    private static readonly JsonSerializerOptions options;
 
     public CacheRepository(ConnectionMultiplexer multiplexer, IRepository next)
     {
         this.multiplexer = multiplexer ?? throw new ArgumentNullException(nameof(multiplexer));
         this.next = next ?? throw new ArgumentNullException(nameof(next));
+    }
+
+    static CacheRepository()
+    {
+        options = new JsonSerializerOptions();
+        options.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
     }
 
     public async Task<Account> GetAccountByIdAsync(int id)
@@ -28,7 +35,7 @@ public sealed class CacheRepository : IDecoratedRepository
 
     private async Task<Account> GetAccountByIdCore(int id, IDatabase db)
     {
-        var accountValues = db.HashGetAll($"{AccountHashPrefix}{id}");
+        var accountValues = await db.HashGetAllAsync($"{AccountHashPrefix}{id}");
 
         if (accountValues.Length == 0 || Array.TrueForAll(accountValues, x => x.Value.IsNullOrEmpty))
         {
@@ -78,16 +85,17 @@ public sealed class CacheRepository : IDecoratedRepository
         if (account is null || account.IsEmpty())
             return new BankStatement();
 
-        var jsonValues = db.SortedSetRangeByRank(GetBankStatementKey(id), 0, -1, Order.Descending);
+        var jsonValues = await db.SortedSetRangeByRankAsync(GetBankStatementKey(id), 0, -1, Order.Descending);
 
         List<BankStatementTransaction> transactions = new(jsonValues.Length);
-        foreach (byte[] x in jsonValues)
+        foreach (string x in jsonValues)
         {
-            var t = MemoryPackSerializer.Deserialize<BankStatementTransaction>(x);
-            transactions.Add(new BankStatementTransaction(t.Valor, t.Tipo, t.Descricao, t.RealizadaEm));
+            var t = JsonSerializer.Deserialize<BankStatementTransaction>(x, options);
+            transactions.Add(t);
         }
 
-        return new BankStatement(new Balance(account.Limite, account.Saldo),
+        return new BankStatement(
+            saldo: new Balance(account.Limite, account.Saldo),
             ultimasTransacoes: transactions);
     }
 
@@ -110,7 +118,7 @@ public sealed class CacheRepository : IDecoratedRepository
             descricao: transaction.Descricao,
             realizadaEm: transaction.RealizadaEm);
             
-        var serialized = MemoryPackSerializer.Serialize(BankStatementTransaction);
+        var serialized = JsonSerializer.Serialize(BankStatementTransaction, options);
 
         await db.SortedSetAddAsync(key, serialized, transaction.RealizadaEm.Ticks);
         await db.SortedSetRemoveRangeByRankAsync(key, 0, -11);

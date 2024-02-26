@@ -1,12 +1,9 @@
 using System.Text.Json.Serialization;
-using MemoryPack;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 
-[MemoryPackable]
 public sealed partial class BankStatementTransaction
 {
-    [MemoryPackConstructor]
     public BankStatementTransaction(int valor, char tipo, string descricao, DateTime realizadaEm)
     {
         Valor = valor;

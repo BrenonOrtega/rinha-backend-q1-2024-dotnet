@@ -19,10 +19,6 @@ public static class ConfigurationExtensions
         services.AddSingleton<NpgsqlDataSource>(x => new NpgsqlDataSourceBuilder(connectionString).Build());
 
         services.AddScoped<IDecoratedRepository, CacheRepository>();
-        services.AddStackExchangeRedisCache(x =>
-        {
-            x.Configuration = cacheConnectionString;
-        });
 
         services.AddSingleton(_ => ConnectionMultiplexer.Connect(cacheConnectionString, x =>
         {
