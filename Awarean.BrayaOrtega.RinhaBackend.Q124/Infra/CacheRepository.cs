@@ -68,7 +68,7 @@ public sealed class CacheRepository : IDecoratedRepository
         return account;
     }
 
-    private static async Task SetCacheAsync(IDatabase db, int id, int limite, int saldo)
+    private static async Task SetCacheAsync(IDatabaseAsync db, int id, int limite, int saldo)
     {
         await db.HashSetAsync($"{AccountHashPrefix}{id}", [
             new HashEntry(Limite, limite),
@@ -95,21 +95,21 @@ public sealed class CacheRepository : IDecoratedRepository
         }
 
         return new BankStatement(
-            saldo: new Balance(account.Limite, account.Saldo),
+            saldo: new Balance(account.Saldo, account.Limite),
             ultimasTransacoes: transactions);
     }
 
     private static string GetBankStatementKey(int id) => $"{BankStatementPrefix}{id}";
 
-
     public async Task Save(Transaction transaction)
     {
         var db = multiplexer.GetDatabase();
-        await SetCacheAsync(db, transaction.AccountId, transaction.Limite, transaction.Saldo);
-        await SetBankStatementAsync(db, transaction);
+        var task1 = SetCacheAsync(db, transaction.AccountId, transaction.Limite, transaction.Saldo);
+        var task2 = SetBankStatementAsync(db, transaction);
+        await Task.WhenAll(task1, task2);
     }
 
-    private async Task SetBankStatementAsync(IDatabase db, Transaction transaction)
+    private static async Task SetBankStatementAsync(IDatabaseAsync db, Transaction transaction)
     {
         var key = GetBankStatementKey(transaction.AccountId);
         var BankStatementTransaction = new BankStatementTransaction(

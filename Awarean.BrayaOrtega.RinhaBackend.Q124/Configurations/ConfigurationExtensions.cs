@@ -11,28 +11,37 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Configurations;
 
 public static class ConfigurationExtensions
 {
-    public static IServiceCollection ConfigureInfrastructure(this IServiceCollection services,
-     IConfiguration configuration)
+    public static IServiceCollection ConfigureInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("Postgres");
         var cacheConnectionString = configuration.GetConnectionString("Redis");
         services.AddSingleton<NpgsqlDataSource>(x => new NpgsqlDataSourceBuilder(connectionString).Build());
 
-        services.AddScoped<IDecoratedRepository, CacheRepository>();
+        if (configuration.GetValue<bool>("BYPASS_CACHE"))
+        {
+            services.AddScoped<IDecoratedRepository, Repository>();
+        }
+        else
+        {
+            AddRedisCacheRepository(services, cacheConnectionString);
+        }
 
+        services.AddScoped<IRepository, Repository>();
+
+        return services;
+    }
+
+    private static void AddRedisCacheRepository(IServiceCollection services, string cacheConnectionString)
+    {
         services.AddSingleton(_ => ConnectionMultiplexer.Connect(cacheConnectionString, x =>
         {
             x.ConnectRetry = 10;
-            
+
             x.AsyncTimeout = 10000;
             x.KeepAlive = 180;
         }));
 
         services.AddScoped<IDecoratedRepository, CacheRepository>();
-
-        services.AddScoped<IRepository, Repository>();
-
-        return services;
     }
 
     public static IServiceCollection ConfigureMessaging(this IServiceCollection services, IConfiguration config)

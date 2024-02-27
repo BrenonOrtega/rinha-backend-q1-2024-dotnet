@@ -5,7 +5,7 @@ using NpgsqlTypes;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 
-public class Repository : IRepository
+public class Repository : IRepository, IDecoratedRepository
 {
     private readonly NpgsqlDataSource dataSource;
 
