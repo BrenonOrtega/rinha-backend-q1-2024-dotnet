@@ -22,7 +22,7 @@ public sealed partial class TransactionRequest
 
     public bool IsInvalid() 
         => Valor < 0 
-        || Tipo is not Transaction.Credit and not Transaction.Debit
+        || Tipo is not Transaction.Credit and not Transaction.Debt
         || string.IsNullOrEmpty(Descricao) 
         || Descricao.Length > 10;
 }

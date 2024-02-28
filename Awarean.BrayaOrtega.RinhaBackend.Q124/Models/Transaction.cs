@@ -5,7 +5,7 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124;
 public class Transaction
 {
     public const char Credit = 'c';
-    public const char Debit = 'd';
+    public const char Debt = 'd';
 
     [JsonConstructor]
     public Transaction(int valor, char tipo, string descricao, int accountId,
@@ -20,7 +20,6 @@ public class Transaction
         RealizadaEm = realizadaEm;
     }
 
-
     public int Valor { get; }
 
     public char Tipo { get; }
@@ -31,7 +30,12 @@ public class Transaction
 
     public int Limite { get; }
 
-    public int Saldo { get; }
+    public int Saldo { get; private set; }
 
     public DateTime RealizadaEm { get; }
+
+    internal void UpdateSaldo(long newSaldo)
+    {
+        Saldo = (int)newSaldo;
+    }
 }

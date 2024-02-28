@@ -1,5 +1,7 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
+using NATS.Client.JetStream;
 using StackExchange.Redis;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
@@ -37,24 +39,23 @@ public sealed class CacheRepository : IDecoratedRepository
     {
         var accountValues = await db.HashGetAllAsync($"{AccountHashPrefix}{id}");
 
-        if (accountValues.Length == 0 || Array.TrueForAll(accountValues, x => x.Value.IsNullOrEmpty))
+        if (accountValues.Length == 0 || Array.TrueForAll(accountValues, x => x.Name.IsNullOrEmpty))
         {
             return await QueryAndSetCache(db, id);
         }
 
-        int limite = -1;
-        int saldo = -1;
+        int limite = 0;
+        int saldo = 0;
 
         foreach (var hash in accountValues)
         {
-            if (hash.Name == Limite)
-                limite = int.Parse(hash.Value);
-            if (hash.Name == Saldo)
-                saldo = int.Parse(hash.Value);
+            _ = (string)hash.Name switch
+            {
+                Limite => limite = int.Parse(hash.Value),
+                Saldo => saldo = int.Parse(hash.Value),
+                _ => 0
+            };
         }
-
-        if (limite is -1 && saldo is -1)
-            return await QueryAndSetCache(db, id);
 
         return new Account(id, limite, saldo);
     }
@@ -63,18 +64,22 @@ public sealed class CacheRepository : IDecoratedRepository
     {
         var account = await next.GetAccountByIdAsync(id);
 
-        await SetCacheAsync(db, account.Id, account.Limite, account.Saldo);
+        if (account is not null)
+            await SetCacheAsync(db, account.Id, account.Limite, account.Saldo);
 
         return account;
     }
 
     private static async Task SetCacheAsync(IDatabaseAsync db, int id, int limite, int saldo)
     {
-        await db.HashSetAsync($"{AccountHashPrefix}{id}", [
+        string key = GetAccountKey(id);
+        await db.HashSetAsync(key: key, [
             new HashEntry(Limite, limite),
             new HashEntry(Saldo, saldo)
         ]);
     }
+
+    private static string GetAccountKey(int id) => $"{AccountHashPrefix}{id}";
 
     public async Task<BankStatement> GetBankStatementAsync(int id)
     {
@@ -101,12 +106,15 @@ public sealed class CacheRepository : IDecoratedRepository
 
     private static string GetBankStatementKey(int id) => $"{BankStatementPrefix}{id}";
 
-    public async Task Save(Transaction transaction)
+    public async Task<bool> Save(Transaction transaction)
     {
         var db = multiplexer.GetDatabase();
-        var task1 = SetCacheAsync(db, transaction.AccountId, transaction.Limite, transaction.Saldo);
-        var task2 = SetBankStatementAsync(db, transaction);
-        await Task.WhenAll(task1, task2);
+
+        var updateSnapshot = UpdateAccountSnapshot(transaction, db);
+        var setBankStatement = SetBankStatementAsync(db, transaction);
+        await Task.WhenAll(updateSnapshot, setBankStatement);
+
+        return updateSnapshot.Result;
     }
 
     private static async Task SetBankStatementAsync(IDatabaseAsync db, Transaction transaction)
@@ -117,10 +125,69 @@ public sealed class CacheRepository : IDecoratedRepository
             tipo: transaction.Tipo,
             descricao: transaction.Descricao,
             realizadaEm: transaction.RealizadaEm);
-            
+
         var serialized = JsonSerializer.Serialize(BankStatementTransaction, options);
 
         await db.SortedSetAddAsync(key, serialized, transaction.RealizadaEm.Ticks);
         await db.SortedSetRemoveRangeByRankAsync(key, 0, -11);
+    }
+
+    private Task<bool> UpdateAccountSnapshot(Transaction transaction, IDatabase db)
+    {
+        Task<bool> updateSnapshot;
+        if (transaction.Tipo is Transaction.Credit)
+            updateSnapshot = IncrementAcountValue(db, transaction);
+        else
+        {
+            updateSnapshot = TryDecrementAccountValue(db, transaction);
+        }
+
+        return updateSnapshot;
+    }
+
+    private static async Task<bool> IncrementAcountValue(IDatabaseAsync db, Transaction transaction)
+    {
+        long newSaldo = default;
+
+        var key = GetAccountKey(transaction.AccountId);
+        async Task<long> IncrementSaldoAsync() 
+            => newSaldo = await db.HashIncrementAsync(
+                    key: key,
+                    hashField: Saldo,
+                    value: transaction.Valor);
+
+        await Task.WhenAll(IncrementSaldoAsync(), UpdateLimiteAsync(db, key, transaction));
+
+        transaction.UpdateSaldo(newSaldo);
+        return true;
+    }
+
+    private static async Task UpdateLimiteAsync(IDatabaseAsync db, string accountId, Transaction transaction)
+    {
+        await db.HashSetAsync(accountId, [new HashEntry(Limite, transaction.Limite)]);
+    }
+
+    private async Task<bool> TryDecrementAccountValue(IDatabase db, Transaction transaction)
+    {
+        int accountId = transaction.AccountId;
+        var account = await GetAccountByIdCore(accountId, db);
+        int value = transaction.Valor;
+        if (account is not null && account.CanExecuteDebt(value))
+        {
+            var key = GetAccountKey(accountId);
+            long newSaldo = default;
+            async Task DecrementAsync() => newSaldo = await db.HashDecrementAsync(key, Saldo, value);
+
+            await Task.WhenAll(
+                DecrementAsync(), 
+                UpdateLimiteAsync(db, key, transaction));
+
+            Console.WriteLine($"Expected saldo for transaction was {transaction.Saldo} and was {newSaldo}");
+            transaction.UpdateSaldo(newSaldo);
+
+            return true;
+        }
+
+        return false;
     }
 }

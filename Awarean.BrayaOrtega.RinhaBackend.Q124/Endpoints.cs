@@ -32,8 +32,11 @@ public static class Endpoints
 
         var createdTransaction = account.Execute(request);
 
-        await repo.Save(createdTransaction);
+        var saved = await repo.Save(createdTransaction);
 
+        if (saved is false)
+            return UnprocessableEntityResponse;
+            
         await connection.PublishAsync<Transaction>(
             natsDestinationQueue,
             createdTransaction,

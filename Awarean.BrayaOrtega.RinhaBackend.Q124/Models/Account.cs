@@ -26,16 +26,15 @@ public sealed partial class Account
     {
         var transactionType = transaction.Tipo;
 
-        if (transactionType is not Transaction.Credit and not Transaction.Debit)
+        if (transactionType is not Transaction.Credit and not Transaction.Debt)
             return false;
 
         if (transaction.Descricao is null or { Length: 0 or > 10 })
             return false;
 
-        if (transactionType is Transaction.Debit)
+        if (transactionType is Transaction.Debt)
         {
-            int remainingLimit = GetRemainingLimit();
-            return transaction.Valor <= remainingLimit;
+            return CanExecuteDebt(transaction.Valor);
         }
 
         return true;
@@ -56,4 +55,10 @@ public sealed partial class Account
     }
 
     internal bool IsEmpty() => Id is 0 && Saldo is 0 && Limite is 0;
+
+    internal bool CanExecuteDebt(int value)
+    {
+        int remainingLimit = GetRemainingLimit();
+        return value <= remainingLimit;
+    }
 }

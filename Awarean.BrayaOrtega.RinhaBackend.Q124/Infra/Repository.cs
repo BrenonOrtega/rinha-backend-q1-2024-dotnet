@@ -150,7 +150,7 @@ public class Repository : IRepository, IDecoratedRepository
         return balance;
     }
 
-    public async Task Save(Transaction transaction)
+    public async Task<bool> Save(Transaction transaction)
     {
         var sql = @"INSERT INTO Transactions 
                             (Tipo, Valor, Descricao, RealizadaEm, Limite, Saldo, AccountId)
@@ -182,5 +182,7 @@ public class Repository : IRepository, IDecoratedRepository
         {
             await conn.CloseAsync();
         }
+
+        return true;
     }
 }
