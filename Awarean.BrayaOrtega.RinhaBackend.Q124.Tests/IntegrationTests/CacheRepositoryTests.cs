@@ -14,6 +14,7 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 
 public class CacheRepositoryTests : IDisposable
 {
+    private readonly ConnectionMultiplexer cache;
     private readonly IRepository next;
     private readonly IRepository repo;
 
@@ -31,15 +32,23 @@ public class CacheRepositoryTests : IDisposable
             .ConfigureInfrastructure(config)
             .BuildServiceProvider();
 
-        var cache = services.GetRequiredService<ConnectionMultiplexer>();
+        cache = services.GetRequiredService<ConnectionMultiplexer>();
         next = Substitute.For<IRepository>();
         repo = new CacheRepository(cache, next);
     }
 
     [Fact]
     public async Task Should_Save_Correctly()
-    {
-        var transaction = new Transaction(20, 'c', "a", 1, 20000, 0, DateTime.UtcNow);
+    { 
+        var transaction = new Transaction(
+            valor: 20,
+            tipo: 'c',
+            descricao: "a",
+            accountId: 1,
+            limite: 20000,
+            saldo: 0,
+            realizadaEm: DateTime.UtcNow);
+
         await repo.Save(transaction);
 
         var actual = await repo.GetAccountByIdAsync(transaction.AccountId);
@@ -61,7 +70,138 @@ public class CacheRepositoryTests : IDisposable
         await next.Received(1).GetAccountByIdAsync(Arg.Is(account.Id));
     }
 
+    [Fact]
+    public async Task SavingCreditShouldDoAutomatically()
+    {
+        // Given
+        var transaction = new Transaction(250, Transaction.Credit, "deposito", 4, 0, 0, DateTime.Now);
+        // When
+
+        var result = await repo.Save(transaction);
+    
+        // Then
+        result.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SavingCreditShouldIncrementAccountSnapshot()
+    {
+        // Given
+        var transaction = new Transaction(250, Transaction.Credit, "deposito", 4, 0, 0, DateTime.Now);
+
+        // When
+        await repo.Save(transaction);
+
+        var actual = await repo.GetAccountByIdAsync(transaction.AccountId);
+    
+        // Then
+        actual.Saldo.Should().Be(transaction.Valor);
+    }
+
+    [Fact]
+    public async Task SavingDebtShouldDecrementAccountSnapshot()
+    {
+        var existingTransaction = new Transaction(250, Transaction.Credit, "deposito", 4, 0, 0, DateTime.Now);
+        await repo.Save(existingTransaction);
+
+        var debtTransaction = new Transaction(existingTransaction.Valor,
+            Transaction.Debt, "debito", existingTransaction.AccountId, 0, 0, DateTime.Now);
+
+        await repo.Save(debtTransaction);
+    
+        var expectedSaldo = debtTransaction.Valor - existingTransaction.Valor;
+        var actual = await repo.GetAccountByIdAsync(debtTransaction.AccountId);
+        actual.Saldo.Should().Be(expectedSaldo);
+    }
+
+    [Fact]
+    public async Task Invalid_Debt_Transaction_Should_Fail()
+    {
+        var accountId = 9;
+        var existingTransaction = new Transaction(
+            valor: 250,
+            tipo: Transaction.Credit,
+            descricao: "deposito",
+            accountId: accountId,
+            limite: 0,
+            saldo: 0,
+            realizadaEm: DateTime.Now);
+            
+        await repo.Save(existingTransaction);
+
+        var invalidDebtTransaction = new Transaction(
+            valor: existingTransaction.Valor + 1,
+            tipo: Transaction.Debt,
+            descricao: "debito",
+            accountId: accountId,
+            limite: 0,
+            saldo: 0,
+            realizadaEm: DateTime.Now);
+
+        var result = await repo.Save(invalidDebtTransaction);
+    
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task And_Account_Is_Not_Found_Should_Fail()
+    {
+        var inexistentId = 20;
+        var invalidDebtTransaction = new Transaction(
+            valor: 1,
+            tipo: Transaction.Debt,
+            descricao: "debito",
+            accountId: inexistentId,
+            limite: 0,
+            saldo: 0,
+            realizadaEm: DateTime.Now);
+
+        var result = await repo.Save(invalidDebtTransaction);
+    
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Transaction_Should_Be_Updated_If_Occurs_With_Differente_Balance_Values()
+    {
+        var account = new Account(9, limite: 0, saldo: 0);
+
+        //Debt created
+        TransactionRequest debtRequest = new TransactionRequest(
+                    valor: account.Saldo + 1,
+                    tipo: Transaction.Debt,
+                    descricao: "alterValue");
+
+        var debt = account.Execute(debtRequest);
+        
+        // Credit occurs before debt (concurrency)
+        var credit = account.Execute(new TransactionRequest(
+            valor: 250,
+            tipo: Transaction.Credit,
+            descricao: "deposito"));
+
+        await repo.Save(credit);
+
+        //Debt is finally saved.
+        await repo.Save(debt);
+
+        var actual = await repo.GetBankStatementAsync(account.Id);
+    
+        var actualDebt = actual.UltimasTransacoes.First();
+        var expectedSaldo = credit.Valor - debtRequest.Valor;
+        
+        //This ensures the maths match.
+        actual.Saldo.Total.Should().Be(expectedSaldo);
+        
+        // This ensures database will be consistent when saved.
+        actual.Saldo.Total.Should().Be(debt.Saldo);
+
+        actualDebt.RealizadaEm.Should().Be(debt.RealizadaEm);
+    }
+
     public void Dispose()
     {
+        _ = cache.GetDatabase().ExecuteAsync("FLUSHDB").GetAwaiter().GetResult();
+        GC.SuppressFinalize(this);
     }
 }

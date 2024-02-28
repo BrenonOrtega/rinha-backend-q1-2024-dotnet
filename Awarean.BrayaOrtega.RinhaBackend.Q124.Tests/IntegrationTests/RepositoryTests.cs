@@ -11,6 +11,7 @@ namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 public sealed class RepositoryTests : IDisposable
 {
     private readonly IRepository repo;
+    private readonly NpgsqlDataSource pg;
 
     [Fact]
     public async Task Saving_Account_Should_Succeed()
@@ -58,9 +59,16 @@ public sealed class RepositoryTests : IDisposable
             .BuildServiceProvider();
 
         repo = services.GetRequiredService<IRepository>();
+        pg = services.GetRequiredService<NpgsqlDataSource>();
     }
 
     public void Dispose()
     {
+        using var conn = pg.OpenConnection();
+        using var cmd = conn.CreateCommand();
+
+        cmd.CommandText = "DELETE * FROM transactions WHERE Id > 5;";
+        cmd.ExecuteNonQuery();
+        conn.Close();
     }
 }
