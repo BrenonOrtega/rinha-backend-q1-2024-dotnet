@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
+using Awarean.BrayaOrtega.RinhaBackend.Q124.Services;
 using Microsoft.AspNetCore.Mvc;
 using NATS.Client.Core;
 
@@ -13,43 +14,29 @@ public static class Endpoints
     public static async Task<IResult> MakeTransactionAsync(
             int id,
             [FromBody] TransactionRequest request,
-            [FromServices] IRepository repo,
-            [FromKeyedServices("NatsDestination")] string natsDestinationQueue,
-            [FromServices] INatsConnection connection,
-            Channel<int> channel,
+            [FromServices] ITransactionService service,
             CancellationToken token)
     {
         if (request.IsInvalid())
             return UnprocessableEntityResponse;
 
-        var account = await repo.GetAccountByIdAsync(id);
+        var response = await service.TryExecuteTransactionAsync(id, request);
 
-        if (account is null || account.IsEmpty())
-            return NotFoundResponse;
+        if (!response.IsSuccess)
+        {
+            return response.Error switch {
+                ExecuteTransactionError.AccountNotFound => NotFoundResponse,
+                ExecuteTransactionError.ExceedLimitError => UnprocessableEntityResponse,
+                null => throw new InvalidOperationException(); 
+            };
+        }
 
-        if (account.CanExecute(request) is false)
-            return UnprocessableEntityResponse;
-
-        var createdTransaction = account.Execute(request);
-
-        var saved = await repo.Save(createdTransaction);
-
-        if (saved is false)
-            return UnprocessableEntityResponse;
-            
-        await connection.PublishAsync<Transaction>(
-            natsDestinationQueue,
-            createdTransaction,
-            cancellationToken: token);
-
-        channel.Writer.TryWrite(default);
-
-        return Results.Ok(new TransactionResponse(account.Limite, account.Saldo));
+        return Results.Ok(new TransactionResponse(response.Limite, response.Saldo));
     }
 
-    public static async Task<IResult> GetBankStatementAsync(int id, [FromServices] IDecoratedRepository repo)
+    public static async Task<IResult> GetBankStatementAsync(int id, [FromServices] ITransactionService service)
     {
-        var bankStatement = await repo.GetBankStatementAsync(id);
+        var bankStatement = await service.GetBankStatementAsync(id);
 
         if (bankStatement is not null && !bankStatement.IsEmpty())
             return Results.Ok(bankStatement);
