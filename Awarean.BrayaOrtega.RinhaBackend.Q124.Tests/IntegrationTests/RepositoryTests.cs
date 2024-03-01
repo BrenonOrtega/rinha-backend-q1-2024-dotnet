@@ -67,7 +67,7 @@ public sealed class RepositoryTests : IDisposable
         using var conn = pg.OpenConnection();
         using var cmd = conn.CreateCommand();
 
-        cmd.CommandText = "DELETE * FROM transactions WHERE Id > 5;";
+        cmd.CommandText = "DEL ETE FROM transactions WHERE Id > 5;";
         cmd.ExecuteNonQuery();
         conn.Close();
     }

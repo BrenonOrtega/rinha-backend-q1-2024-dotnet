@@ -32,10 +32,11 @@ public class Transaction
 
     public int Saldo { get; private set; }
 
-    public DateTime RealizadaEm { get; }
+    public DateTime RealizadaEm { get; private set; }
 
     internal void UpdateSaldo(long newSaldo)
     {
         Saldo = (int)newSaldo;
+        RealizadaEm = DateTime.Now;
     }
 }

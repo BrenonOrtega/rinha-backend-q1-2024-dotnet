@@ -61,15 +61,19 @@ public class Repository : IRepository, IDecoratedRepository
 
     public async Task<BankStatement> GetBankStatementAsync(int id)
     {
+        using var conn = await dataSource.OpenConnectionAsync();
+        return await GetBankStatementCoreAsync(id, conn);
+    }
+
+    public static async Task<BankStatement> GetBankStatementCoreAsync(int id, NpgsqlConnection conn)
+    {
         var sql = @$"SELECT Limite, Saldo, Descricao, RealizadaEm, Valor, Tipo 
             FROM Transactions
             WHERE AccountId = @Id
             ORDER BY RealizadaEm DESC
             LIMIT 10;";
 
-        using var conn = await dataSource.OpenConnectionAsync();
-
-        using var command = new NpgsqlCommand(sql, conn);
+        var command = new NpgsqlCommand(sql, conn);
         command.Parameters.AddWithValue("@Id", id);
 
         try

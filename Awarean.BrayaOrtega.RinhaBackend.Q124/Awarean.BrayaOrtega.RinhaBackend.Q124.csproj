@@ -17,7 +17,7 @@
     <PackageReference Include="NATS.Client.Serializers.Json" Version="2.1.1" />
     <PackageReference Include="Nats.Net" Version="2.1.1" />
     <PackageReference Include="Npgsql" Version="8.0.2" />
-    <PackageReference Include="Redlock.NET" Version="2.3.2" />
+    <PackageReference Include="RedLock" Version="9.0.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.7.20" />
   </ItemGroup>
 

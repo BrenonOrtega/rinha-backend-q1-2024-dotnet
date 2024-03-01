@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
+using Elders.RedLock;
 using NATS.Client.JetStream;
 using StackExchange.Redis;
 
@@ -15,12 +16,14 @@ public sealed class CacheRepository : IDecoratedRepository
 
     private readonly ConnectionMultiplexer multiplexer;
     private readonly IRepository next;
+    private readonly ILogger<CacheRepository> logger;
     private static readonly JsonSerializerOptions options;
 
-    public CacheRepository(ConnectionMultiplexer multiplexer, IRepository next)
+    public CacheRepository(ConnectionMultiplexer multiplexer, IRepository next, ILogger<CacheRepository> logger)
     {
         this.multiplexer = multiplexer ?? throw new ArgumentNullException(nameof(multiplexer));
         this.next = next ?? throw new ArgumentNullException(nameof(next));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     static CacheRepository()
@@ -110,11 +113,11 @@ public sealed class CacheRepository : IDecoratedRepository
     {
         var db = multiplexer.GetDatabase();
 
-        var updateSnapshot = UpdateAccountSnapshot(transaction, db);
-        var setBankStatement = SetBankStatementAsync(db, transaction);
-        await Task.WhenAll(updateSnapshot, setBankStatement);
+        var snapshotUpdated = await UpdateAccountSnapshot(transaction, db);
+        if (snapshotUpdated)
+            await SetBankStatementAsync(db, transaction);
 
-        return updateSnapshot.Result;
+        return snapshotUpdated;
     }
 
     private static async Task SetBankStatementAsync(IDatabaseAsync db, Transaction transaction)
@@ -150,7 +153,7 @@ public sealed class CacheRepository : IDecoratedRepository
         long newSaldo = default;
 
         var key = GetAccountKey(transaction.AccountId);
-        async Task<long> IncrementSaldoAsync() 
+        async Task<long> IncrementSaldoAsync()
             => newSaldo = await db.HashIncrementAsync(
                     key: key,
                     hashField: Saldo,
@@ -170,24 +173,36 @@ public sealed class CacheRepository : IDecoratedRepository
     private async Task<bool> TryDecrementAccountValue(IDatabase db, Transaction transaction)
     {
         int accountId = transaction.AccountId;
+
         var account = await GetAccountByIdCore(accountId, db);
         int value = transaction.Valor;
         if (account is not null && account.CanExecuteDebt(value))
         {
-            var key = GetAccountKey(accountId);
-            long newSaldo = default;
-            async Task DecrementAsync() => newSaldo = await db.HashDecrementAsync(key, Saldo, value);
+            long newSaldo = await ExecuteDebtAndGetNewSaldoAsync(db, transaction, accountId, value);
 
-            await Task.WhenAll(
-                DecrementAsync(), 
-                UpdateLimiteAsync(db, key, transaction));
+            logger.LogInformation($"Expected saldo for transaction with value {transaction.Valor} was {transaction.Saldo} and was {newSaldo}");
 
-            Console.WriteLine($"Expected saldo for transaction was {transaction.Saldo} and was {newSaldo}");
-            transaction.UpdateSaldo(newSaldo);
+            // if (newSaldo != transaction.Saldo)
+            //     transaction.UpdateSaldo(newSaldo);
 
             return true;
         }
 
+        logger.LogInformation("REFUSED - Transaction with value {value} expected to be executed with balance {transactionBalance} but actual balance is {actualBalance}.",
+                 transaction.Valor, transaction.Saldo, account?.Saldo);
         return false;
+    }
+
+    private static async Task<long> ExecuteDebtAndGetNewSaldoAsync(IDatabase db, Transaction transaction, int accountId, int value)
+    {
+        long newSaldo = default;
+        var key = GetAccountKey(accountId);
+        async Task DecrementAsync() => newSaldo = await db.HashDecrementAsync(key, Saldo, value);
+
+        await Task.WhenAll(
+            DecrementAsync(),
+            UpdateLimiteAsync(db, key, transaction));
+
+        return newSaldo;
     }
 }

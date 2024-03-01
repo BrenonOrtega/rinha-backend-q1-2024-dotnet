@@ -9,6 +9,8 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Caching.Distributed;
 using StackExchange.Redis;
+using Castle.Core.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Tests.IntegrationTests;
 
@@ -29,12 +31,14 @@ public class CacheRepositoryTests : IDisposable
             ])
             .Build();
         var services = new ServiceCollection()
+            .AddLogging()
             .ConfigureInfrastructure(config)
             .BuildServiceProvider();
 
         cache = services.GetRequiredService<ConnectionMultiplexer>();
         next = Substitute.For<IRepository>();
-        repo = new CacheRepository(cache, next);
+        var logger = services.GetRequiredService<ILogger<CacheRepository>>();
+        repo = new CacheRepository(cache, next, logger);
     }
 
     [Fact]
@@ -196,7 +200,51 @@ public class CacheRepositoryTests : IDisposable
         // This ensures database will be consistent when saved.
         actual.Saldo.Total.Should().Be(debt.Saldo);
 
-        actualDebt.RealizadaEm.Should().Be(debt.RealizadaEm);
+        actualDebt.RealizadaEm.Should().BeCloseTo(debt.RealizadaEm, TimeSpan.FromMilliseconds(1));
+    }
+
+    [Fact]
+    public async Task Refused_Transaction_Should_Not_Send_In_Statement_List()
+    {
+        var creditTransaction =  new Transaction(
+            valor: 1,
+            tipo: Transaction.Credit,
+            descricao: "credito",
+            accountId: 10,
+            limite: 0,
+            saldo: 0,
+            realizadaEm: DateTime.Now.AddHours(-1));
+
+        await repo.Save(creditTransaction);
+
+        var invalidDebtTransaction = new Transaction(
+            valor: creditTransaction.Valor + 1,
+            tipo: Transaction.Debt,
+            descricao: "debito",
+            accountId: creditTransaction.AccountId,
+            limite: 0,
+            saldo: 0,
+            realizadaEm: DateTime.Now);
+
+        await repo.Save(invalidDebtTransaction);
+    
+        var bankStatement = await repo.GetBankStatementAsync(creditTransaction.AccountId);
+
+        var actualLastTransaction = bankStatement.UltimasTransacoes.First();
+        var equivalent = new BankStatementTransaction(
+            invalidDebtTransaction.Valor,
+            invalidDebtTransaction.Tipo,
+            invalidDebtTransaction.Descricao,
+            invalidDebtTransaction.RealizadaEm
+        );
+
+        actualLastTransaction.Should().NotBeEquivalentTo(equivalent);
+    }
+
+    [Fact]
+    public async Task When_Queried_Account_Value_Is_Equal_To_Debt_Transaction_Shouldnt_Update_Transaction()
+    {
+        
     }
 
     public void Dispose()

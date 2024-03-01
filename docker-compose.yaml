@@ -27,7 +27,7 @@ services:
       resources:
         limits:
           cpus: "0.25"
-          memory: "50MB"
+          memory: "70MB"
 
   webapi2:
     <<: *api 
@@ -51,7 +51,7 @@ services:
       resources:
         limits:
           cpus: "0.2"
-          memory: "50MB"
+          memory: "70MB"
 
   messagequeue:
     image: nats:2.7.4
@@ -64,7 +64,7 @@ services:
       resources:
         limits:
           cpus: "0.15"
-          memory: "25MB"
+          memory: "35MB"
 
   cache:
     image: redis:alpine
@@ -78,7 +78,7 @@ services:
       resources:
         limits:
           cpus: "0.15"
-          memory: "25MB"
+          memory: "35MB"
           
   postgres:
     image: postgres
@@ -103,7 +103,7 @@ services:
       resources:
         limits:
           cpus: "0.15"
-          memory: "200MB"
+          memory: "180MB"
 
 networks:
   rinha_network:
