@@ -20,14 +20,14 @@ public static class Endpoints
         if (request.IsInvalid())
             return UnprocessableEntityResponse;
 
-        var response = await service.TryExecuteTransactionAsync(id, request);
+        var response = await service.TryExecuteTransactionAsync(id, request, token);
 
-        if (!response.IsSuccess)
+        if (response.IsSuccess is false)
         {
             return response.Error switch {
-                ExecuteTransactionError.AccountNotFound => NotFoundResponse,
-                ExecuteTransactionError.ExceedLimitError => UnprocessableEntityResponse,
-                null => throw new InvalidOperationException(); 
+                TransactionExecutionError.AccountNotFound => NotFoundResponse,
+                TransactionExecutionError.ExceedLimitError => UnprocessableEntityResponse,
+                _ => throw new InvalidOperationException(), 
             };
         }
 

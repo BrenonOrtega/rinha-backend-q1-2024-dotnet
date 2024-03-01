@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
+using Awarean.BrayaOrtega.RinhaBackend.Q124.Services;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.KeyValueStore;
@@ -14,25 +15,18 @@ public static class ConfigurationExtensions
     public static IServiceCollection ConfigureInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("Postgres");
-        var cacheConnectionString = configuration.GetConnectionString("Redis");
         services.AddSingleton<NpgsqlDataSource>(x => new NpgsqlDataSourceBuilder(connectionString).Build());
 
-        if (configuration.GetValue<bool>("BYPASS_CACHE"))
-        {
-            services.AddScoped<IDecoratedRepository, Repository>();
-        }
-        else
-        {
-            AddRedisCacheRepository(services, cacheConnectionString);
-        }
-
+        AddTransactionService(services, configuration);
         services.AddScoped<IRepository, Repository>();
 
         return services;
     }
 
-    private static void AddRedisCacheRepository(IServiceCollection services, string cacheConnectionString)
+    private static void AddTransactionService(IServiceCollection services, IConfiguration configuration)
     {
+        var cacheConnectionString = configuration.GetConnectionString("Redis");
+
         services.AddSingleton(_ => ConnectionMultiplexer.Connect(cacheConnectionString, x =>
         {
             x.ConnectRetry = 10;
@@ -41,20 +35,18 @@ public static class ConfigurationExtensions
             x.KeepAlive = 180;
         }));
 
-        services.AddScoped<IDecoratedRepository, CacheRepository>();
-    }
-
-    public static IServiceCollection ConfigureMessaging(this IServiceCollection services, IConfiguration config)
-    {
         services.AddSingleton<Channel<int>>(_ => Channel.CreateUnbounded<int>());
-        return ConfigureNats(services, config);
+        ConfigureNats(services, configuration);
+
+        services.AddScoped<ITransactionService, RedisTransactionService>();
     }
 
-    private static IServiceCollection ConfigureNats(IServiceCollection services, IConfiguration config)
+    private static IServiceCollection ConfigureNats(IServiceCollection services, IConfiguration configuration)
     {
-        string natsConnectionString = config.GetConnectionString("Nats");
-        string natsDestinationQueue = config["NATS_DESTINATION"];
-        string natsOwnQueue = config["NATS_OWN"];
+        string natsConnectionString = configuration.GetConnectionString("Nats");
+        string natsDestinationQueue = configuration["NATS_DESTINATION"];
+        string natsOwnQueue = configuration["NATS_OWN"];
+
         services.AddKeyedSingleton("Nats", natsConnectionString);
         services.AddKeyedSingleton("NatsDestination", natsDestinationQueue);
         services.AddKeyedSingleton("NatsOwnChannel", natsOwnQueue);
@@ -67,17 +59,6 @@ public static class ConfigurationExtensions
         };
 
         services.AddSingleton<INatsConnection>(_ => new NatsConnection(opts));
-        services.AddSingleton<INatsKVStore>(provider =>
-        {
-            var conn = provider.GetRequiredService<INatsConnection>();
-            var js = new NatsJSContext((NatsConnection)conn);
-            var ctx = new NatsKVContext(js);
-
-            var store = ctx.CreateStoreAsync(nameof(Account));
-            while (store.IsCompleted is false) { }
-
-            return store.Result;
-        });
 
         return services;
     }

@@ -1,30 +1,26 @@
-using System.Security.Cryptography;
 using System.Text.Json;
+using System.Threading.Channels;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
-using NATS.Client.JetStream;
+using NATS.Client.Core;
 using StackExchange.Redis;
 
 namespace Awarean.BrayaOrtega.RinhaBackend.Q124.Services;
 
 public sealed class RedisTransactionService : ITransactionService
 {
-    private const string Limite = nameof(Account.Limite);
-    private const string Saldo = nameof(Account.Saldo);
-    private const string AccountHashPrefix = "Account:";
     private const string BankStatementPrefix = "BankStatement:";
 
     private readonly ConnectionMultiplexer multiplexer;
-    ConnectionMultiplexer multiplexer,
     private readonly string natsDestinationQueue;
     private readonly INatsConnection connection;
     private readonly Channel<int> channel;
 
     private static readonly JsonSerializerOptions options;
 
-    public CacheRepository(
+    public RedisTransactionService(
         ConnectionMultiplexer multiplexer,
         [FromKeyedServices("NatsDestination")] string natsDestinationQueue,
-        [FromServices] INatsConnection connection,
+        INatsConnection connection,
         Channel<int> channel)
     {
         this.multiplexer = multiplexer ?? throw new ArgumentNullException(nameof(multiplexer));
@@ -33,16 +29,17 @@ public sealed class RedisTransactionService : ITransactionService
         this.channel = channel ?? throw new ArgumentNullException(nameof(channel)); ;
     }
 
-    static CacheRepository()
+    static RedisTransactionService()
     {
         options = new JsonSerializerOptions();
         options.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
     }
 
-    public async Task<ExecuteTransactionResponse> TryExecuteTransactionAsync(int accountId, TransactionRequest transaction)
+    public async Task<ExecuteTransactionResponse> TryExecuteTransactionAsync(
+        int accountId, TransactionRequest transaction, CancellationToken token)
     {
         var db = multiplexer.GetDatabase();
-        var account = await GetAccountByIdCore(accountId, db);
+        var account = await GetAccountByIdCore(accountId, db).ConfigureAwait(false);
 
         if (account is null || account.IsEmpty())
             return new ExecuteTransactionResponse(false, -1, -1, TransactionExecutionError.AccountNotFound);
@@ -53,21 +50,21 @@ public sealed class RedisTransactionService : ITransactionService
         var createdTransaction = account.Execute(transaction);
 
         var key = GetBankStatementKey(accountId);
-        await InsertTransactionAsync(db, key, createdTransaction);
 
-        await Task.WhenAll(
-            db.SortedSetRemoveRangeByRankAsync(key, 0, -11),
-            connection.PublishAsync<Transaction>(
+        await InsertTransactionAsync(db, key, createdTransaction).ConfigureAwait(false);
+
+        await db.SortedSetRemoveRangeByRankAsync(key, 0, -11).ConfigureAwait(false);
+        await connection.PublishAsync<Transaction>(
                 natsDestinationQueue,
                 createdTransaction,
-                cancellationToken: token));
+                cancellationToken: token).ConfigureAwait(false);
 
         channel.Writer.TryWrite(default);
 
         return new ExecuteTransactionResponse(true, createdTransaction.Limite, createdTransaction.Saldo);
     }
 
-    private async Task<Account> GetAccountByIdCore(int id, IDatabase db)
+    private static async Task<Account> GetAccountByIdCore(int id, IDatabase db)
     {
         var transactions = await db.SortedSetRangeByRankAsync(GetBankStatementKey(id), -1, -1, Order.Descending);
 
@@ -91,30 +88,42 @@ public sealed class RedisTransactionService : ITransactionService
     {
         var db = multiplexer.GetDatabase();
 
-        var account = await GetAccountByIdCore(id, db);
+       var (balance, transactions) = await GetLastTransactionsAsync(id, db).ConfigureAwait(false);
 
-        if (account is null || account.IsEmpty())
+        if (balance is null || balance.IsEmpty())
             return new BankStatement();
 
-        var transactions = GetLastTransactionsAsync(id, db);
-
         return new BankStatement(
-            saldo: new Balance(account.Saldo, account.Limite),
+            saldo: balance,
             ultimasTransacoes: transactions);
     }
 
-    public async Task<List<BankStatementTransaction>> GetLastTransactionsAsync(int id, IDatabaseAsync db)
+    public async Task<(Balance, List<BankStatementTransaction>)> GetLastTransactionsAsync(int id, IDatabaseAsync db)
     {
-        var jsonValues = await db.SortedSetRangeByRankAsync(GetBankStatementKey(id), -1, 0, Order.Descending);
+        var jsonValues = await db.SortedSetRangeByRankAsync(
+            key: GetBankStatementKey(id),
+            start: -1,
+            stop: 0,
+            order: Order.Descending)
+            .ConfigureAwait(false);
 
+        Balance balance = null;
         List<BankStatementTransaction> transactions = new(jsonValues.Length);
-        foreach (string x in jsonValues)
+
+        for(var index =0; index < jsonValues.Length; index++) 
         {
+            string x = jsonValues[index];
+            if (index == 0)
+            {
+                var b = JsonSerializer.Deserialize<Transaction>(x, options);
+                balance = new Balance(b.Saldo, b.Limite);
+            }
+
             var t = JsonSerializer.Deserialize<BankStatementTransaction>(x, options);
             transactions.Add(t);
         }
 
-        return transactions;
+        return (balance, transactions);
     }
 
     private static string GetBankStatementKey(int id) => $"{BankStatementPrefix}{id}";
