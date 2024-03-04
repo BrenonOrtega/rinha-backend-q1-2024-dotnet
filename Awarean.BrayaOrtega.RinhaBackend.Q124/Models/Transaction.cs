@@ -32,6 +32,7 @@ public class Transaction
 
     public int Saldo { get; private set; }
 
+    [JsonPropertyName("realizada_em")]
     public DateTime RealizadaEm { get; }
 
     internal void UpdateSaldo(long newSaldo)

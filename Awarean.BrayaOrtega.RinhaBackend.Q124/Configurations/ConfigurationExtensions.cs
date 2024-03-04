@@ -1,10 +1,7 @@
 using System.Threading.Channels;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Infra;
-using Awarean.BrayaOrtega.RinhaBackend.Q124.Models;
 using Awarean.BrayaOrtega.RinhaBackend.Q124.Services;
 using NATS.Client.Core;
-using NATS.Client.JetStream;
-using NATS.Client.KeyValueStore;
 using Npgsql;
 using StackExchange.Redis;
 
@@ -38,7 +35,9 @@ public static class ConfigurationExtensions
         services.AddSingleton<Channel<int>>(_ => Channel.CreateUnbounded<int>());
         ConfigureNats(services, configuration);
 
-        services.AddScoped<ITransactionService, RedisTransactionService>();
+        services.AddScoped<ICachedRepository, CachedRepository>();
+
+        services.AddScoped<ITransactionService, TransactionService>();
     }
 
     private static IServiceCollection ConfigureNats(IServiceCollection services, IConfiguration configuration)
@@ -66,7 +65,7 @@ public static class ConfigurationExtensions
     public static IServiceCollection ConfigureBackgroundServices(this IServiceCollection services)
     {
         services.AddHostedService<SaveInBackgroundHostedService>();
-
+        services.AddHostedService<InitializeRedisBackgroundService>();
         return services;
     }
 }
