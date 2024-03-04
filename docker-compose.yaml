@@ -64,7 +64,7 @@ services:
       resources:
         limits:
           cpus: "0.15"
-          memory: "25MB"
+          memory: "75MB"
 
   cache:
     image: redis:alpine
@@ -77,8 +77,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.15"
-          memory: "25MB"
+          cpus: "0.35"
+          memory: "75MB"
           
   postgres:
     image: postgres
@@ -103,7 +103,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.15"
+          cpus: "0.3"
           memory: "200MB"
 
 networks:

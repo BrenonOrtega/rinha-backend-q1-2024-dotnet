@@ -22,19 +22,19 @@ public class InitializeRedisBackgroundService : BackgroundService
         options.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var conn = await GetConnectionAsync();
+        using var conn = GetConnectionAsync().ConfigureAwait(false).GetAwaiter().GetResult();
 
         var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT Limite, Saldo, AccountId, RealizadaEm FROM Transactions WHERE Descricao IS NULL";
 
-        var reader = await cmd.ExecuteReaderAsync(stoppingToken);
+        var reader = cmd.ExecuteReaderAsync(stoppingToken).ConfigureAwait(false).GetAwaiter().GetResult();
 
         var redis = mp.GetDatabase();
 
         var tasks = new List<Task>();
-        while (await reader.ReadAsync(stoppingToken))
+        while (reader.ReadAsync(stoppingToken).ConfigureAwait(false).GetAwaiter().GetResult())
         {
             var limite = reader.GetInt32(0);
             var saldo = reader.GetInt32(1);
@@ -47,9 +47,11 @@ public class InitializeRedisBackgroundService : BackgroundService
             tasks.Add(redis.SortedSetAddAsync($"BankStatement:{accountId}", json, transaction.RealizadaEm.Ticks));
         }
 
-        await Task.WhenAll(tasks);
+        Task.WhenAll(tasks).ConfigureAwait(false).GetAwaiter().GetResult();
 
-        await conn.CloseAsync();
+        conn.CloseAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+
+        return Task.CompletedTask;
     }
 
     private async Task<NpgsqlConnection> GetConnectionAsync()

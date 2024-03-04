@@ -11,22 +11,26 @@ public sealed class TransactionService : ITransactionService
     private readonly string natsDestinationQueue;
     private readonly INatsConnection connection;
     private readonly Channel<int> channel;
+    private readonly ILogger<TransactionService> logger;
 
     public TransactionService(
         ICachedRepository cachedRepository,
         [FromKeyedServices("NatsDestination")] string natsDestinationQueue,
         INatsConnection connection,
-        Channel<int> channel)
+        Channel<int> channel,
+        ILogger<TransactionService> logger)
     {
         this.cachedRepository = cachedRepository ?? throw new ArgumentNullException(nameof(cachedRepository));
         this.natsDestinationQueue = natsDestinationQueue ?? throw new ArgumentNullException(nameof(natsDestinationQueue));
         this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
         this.channel = channel ?? throw new ArgumentNullException(nameof(channel));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<ExecuteTransactionResponse> TryExecuteTransactionAsync(
         int accountId, TransactionRequest transaction, CancellationToken token)
     {
+        using var scope = logger.BeginScope("Timestamp: {Timestamp}", DateTime.Now);
         var account = await cachedRepository.GetAccountByIdAsync(accountId).ConfigureAwait(false);
 
         if (account is null || account.IsEmpty())
@@ -36,6 +40,9 @@ public sealed class TransactionService : ITransactionService
             return new ExecuteTransactionResponse(false, -1, -1, TransactionExecutionError.ExceedLimitError);
 
         var createdTransaction = account.Execute(transaction);
+
+        logger.LogInformation("Created transaction for account:{accountId}-Saldo:{saldo}-Transaction: valor {valor} - Tipo {tipo}.", 
+            accountId, account.Saldo, transaction.Valor, transaction.Tipo);
 
         await cachedRepository.Save(createdTransaction).ConfigureAwait(false);
 
