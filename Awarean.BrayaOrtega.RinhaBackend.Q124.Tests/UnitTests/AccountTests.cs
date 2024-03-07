@@ -46,21 +46,14 @@ public sealed class AccountTests
     {
         var account = new Account(1, 10000, -9998);
 
+        var expectedSaldo = transaction.Tipo is Transaction.Credit 
+            ? account.Saldo + transaction.Valor 
+            : account.Saldo - transaction.Valor;
+
         var actual = account.Execute(transaction);
 
         actual.Should().NotBeNull();
-    }
-
-    [Theory]
-    [MemberData(nameof(ValidTransactionsGeneratorWithExpectedBalance))]
-    public void Executing_Transactions_Should_Change_Balance(int accountBalance,
-        int expectedBalance, TransactionRequest transaction)
-    {
-        var account = new Account(1, 10000, accountBalance);
-
-        account.Execute(transaction);
-
-        account.Saldo.Should().Be(expectedBalance);
+        actual.Saldo.Should().Be(expectedSaldo);
     }
 
     public static IEnumerable<object[]> ValidTransactionsGenerator()
@@ -72,6 +65,19 @@ public sealed class AccountTests
         yield return [new TransactionRequest(1, 'd', "limite -1")];
         //Descricao 10 characteres
         yield return [new TransactionRequest(2, 'd', "0123456789")];
+    }
+
+
+    [Theory]
+    [MemberData(nameof(ValidTransactionsGeneratorWithExpectedBalance))]
+    public void Executing_Transactions_Should_Change_Balance(int accountBalance,
+        int expectedBalance, TransactionRequest transaction)
+    {
+        var account = new Account(1, 10000, accountBalance);
+
+        account.Execute(transaction);
+
+        account.Saldo.Should().Be(expectedBalance);
     }
 
     public static IEnumerable<object[]> ValidTransactionsGeneratorWithExpectedBalance()
