@@ -36,13 +36,16 @@ public sealed class TransactionService : ITransactionService
         if (account is null || account.IsEmpty())
             return new ExecuteTransactionResponse(false, -1, -1, TransactionExecutionError.AccountNotFound);
 
+        logger.LogInformation("Creating transaction for account {accountId} - Saldo: {saldo} - Limite {Limite}.", 
+            accountId, account.Saldo, account.Limite);
+            
         if (account.CanExecute(transaction) is false)
             return new ExecuteTransactionResponse(false, -1, -1, TransactionExecutionError.ExceedLimitError);
 
         var createdTransaction = account.Execute(transaction);
 
-        logger.LogInformation("Created transaction for account:{accountId}-Saldo:{saldo}-Transaction: valor {valor} - Tipo {tipo}.", 
-            accountId, account.Saldo, transaction.Valor, transaction.Tipo);
+        logger.LogInformation("Created transaction for account {accountId} - Saldo {saldo} - Limite {limite} - Transaction: Valor {valor} - Tipo {tipo} - Saldo Atualizado {saldoAtualizado}.", 
+            accountId, account.Saldo, account.Limite, transaction.Valor, transaction.Tipo, createdTransaction.Saldo);
 
         await cachedRepository.Save(createdTransaction).ConfigureAwait(false);
 

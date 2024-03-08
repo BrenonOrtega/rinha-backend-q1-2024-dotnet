@@ -35,7 +35,11 @@ public sealed class CachedRepository : ICachedRepository
 
     private static async Task<Account> GetAccountByIdCore(int id, IDatabase db)
     {
-        var transactions = db.SortedSetRangeByRankWithScores(GetBankStatementKey(id), order: Order.Descending, start:0, stop: 1);
+        var transactions = db.SortedSetRangeByRankWithScores(
+            key: GetBankStatementKey(id),
+            order: Order.Descending,
+            start: 0, 
+            stop: 1);
 
         var lastTransaction = transactions.FirstOrDefault();
         if (string.IsNullOrEmpty(lastTransaction.Element))

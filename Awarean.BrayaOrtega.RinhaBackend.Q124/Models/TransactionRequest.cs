@@ -23,14 +23,14 @@ public sealed partial class TransactionRequest
     public bool IsInvalid()
     {
         if (Tipo is not Transaction.Credit and not Transaction.Debt)
-            return false;
+            return true;
 
         if (Descricao is null or { Length: 0 or > 10 })
-            return false;
+            return true;
 
         if (Valor < 0)
-            return false;
+            return true;
 
-        return true;
+        return false;
     } 
 }
