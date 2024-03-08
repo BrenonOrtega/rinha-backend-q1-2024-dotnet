@@ -3,9 +3,10 @@ version: '3.8'
 services:
   webapi1: &api
     hostname: webapi1
-    image: brenonortega/rinha-backend-dotnet-q1-24:1.0.0
+    image: brenonortega/rinha-backend-dotnet-q1-24:1.0.1
     environment:
       - BYPASS_CACHE=False
+      - Logging_LogLevel_Default=Error
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_ENVIRONMENT=Production
       - DOTNET_TieredPGO=1
@@ -19,13 +20,13 @@ services:
       - "8080"
     depends_on:
       - postgres
-      - messagequeue
+      - message-broker
       - cache
     deploy:
       resources:
         limits:
-          cpus: "0.25"
-          memory: "50MB"
+          cpus: "0.35"
+          memory: "60MB"
 
   webapi2:
     <<: *api 
@@ -51,7 +52,7 @@ services:
           cpus: "0.2"
           memory: "50MB"
 
-  messagequeue:
+  message-broker:
     image: nats:2.7.4
     networks:
       - rinha_network
@@ -62,7 +63,7 @@ services:
       resources:
         limits:
           cpus: "0.15"
-          memory: "30MB"
+          memory: "40MB"
 
   cache:
     image: redis:alpine
@@ -76,7 +77,7 @@ services:
       resources:
         limits:
           cpus: "0.35"
-          memory: "30MB"
+          memory: "75MB"
           
   postgres:
     image: postgres
@@ -101,7 +102,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
+          cpus: "0.2"
           memory: "200MB"
 
 networks:
