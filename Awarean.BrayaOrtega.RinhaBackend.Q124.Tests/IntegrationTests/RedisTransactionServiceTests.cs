@@ -47,7 +47,7 @@ public class CacheRepositoryTests : IDisposable
 
     [Fact]
     public async Task Should_Save_Correctly()
-    { 
+    {
         var accountId = 1;
         var transaction = new TransactionRequest(
             valor: 20,
@@ -57,10 +57,10 @@ public class CacheRepositoryTests : IDisposable
         var result = await service.TryExecuteTransactionAsync(accountId, transaction, CancellationToken.None);
 
         var actual = await service.GetBankStatementAsync(accountId);
+
+        actual.Saldo.Limite.Should().Be(result.Saldo);
+        actual.Saldo.Total.Should().Be(result.Limite);
     }
-    //     actual.Saldo.Limite.Should().Be(transaction.Limite);
-    //     actual.Saldo.Total.Should().Be(transaction.Saldo);
-    // }
 
     // [Fact]
     // public async Task Should_Get_From_Next_When_Not_Found()
@@ -82,7 +82,7 @@ public class CacheRepositoryTests : IDisposable
     //     // When
 
     //     var result = await service.Save(transaction);
-    
+
     //     // Then
     //     result.Should().BeTrue();
     // }
@@ -97,7 +97,7 @@ public class CacheRepositoryTests : IDisposable
     //     await service.Save(transaction);
 
     //     var actual = await service.GetAccountByIdAsync(transaction.AccountId);
-    
+
     //     // Then
     //     actual.Saldo.Should().Be(transaction.Valor);
     // }
@@ -112,7 +112,7 @@ public class CacheRepositoryTests : IDisposable
     //         Transaction.Debt, "debito", existingTransaction.AccountId, 0, 0, DateTime.Now);
 
     //     await service.Save(debtTransaction);
-    
+
     //     var expectedSaldo = debtTransaction.Valor - existingTransaction.Valor;
     //     var actual = await service.GetAccountByIdAsync(debtTransaction.AccountId);
     //     actual.Saldo.Should().Be(expectedSaldo);
@@ -130,7 +130,7 @@ public class CacheRepositoryTests : IDisposable
     //         limite: 0,
     //         saldo: 0,
     //         realizadaEm: DateTime.Now);
-            
+
     //     await service.Save(existingTransaction);
 
     //     var invalidDebtTransaction = new Transaction(
@@ -143,7 +143,7 @@ public class CacheRepositoryTests : IDisposable
     //         realizadaEm: DateTime.Now);
 
     //     var result = await service.Save(invalidDebtTransaction);
-    
+
     //     result.Should().BeFalse();
     // }
 
@@ -161,7 +161,7 @@ public class CacheRepositoryTests : IDisposable
     //         realizadaEm: DateTime.Now);
 
     //     var result = await service.Save(invalidDebtTransaction);
-    
+
     //     result.Should().BeFalse();
     // }
 
@@ -177,7 +177,7 @@ public class CacheRepositoryTests : IDisposable
     //                 descricao: "alterValue");
 
     //     var debt = account.Execute(debtRequest);
-        
+
     //     // Credit occurs before debt (concurrency)
     //     var credit = account.Execute(new TransactionRequest(
     //         valor: 250,
@@ -190,13 +190,13 @@ public class CacheRepositoryTests : IDisposable
     //     await service.Save(debt);
 
     //     var actual = await service.GetBankStatementAsync(account.Id);
-    
+
     //     var actualDebt = actual.UltimasTransacoes.First();
     //     var expectedSaldo = credit.Valor - debtRequest.Valor;
-        
+
     //     //This ensures the maths match.
     //     actual.Saldo.Total.Should().Be(expectedSaldo);
-        
+
     //     // This ensures database will be consistent when saved.
     //     actual.Saldo.Total.Should().Be(debt.Saldo);
 
