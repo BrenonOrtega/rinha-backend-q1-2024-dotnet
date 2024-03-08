@@ -35,7 +35,7 @@ public sealed class CachedRepository : ICachedRepository
 
     private static async Task<Account> GetAccountByIdCore(int id, IDatabase db)
     {
-        var transactions = db.SortedSetRangeByRankWithScores(
+        var transactions = await db.SortedSetRangeByRankWithScoresAsync(
             key: GetBankStatementKey(id),
             order: Order.Descending,
             start: 0, 
