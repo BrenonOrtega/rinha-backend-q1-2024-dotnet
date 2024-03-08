@@ -20,9 +20,17 @@ public sealed partial class TransactionRequest
     [JsonPropertyName("descricao")]
     public string Descricao { get; }
 
-    public bool IsInvalid() 
-        => Valor < 0 
-        || Tipo is not Transaction.Credit and not Transaction.Debt
-        || string.IsNullOrEmpty(Descricao) 
-        || Descricao.Length > 10;
+    public bool IsInvalid()
+    {
+        if (Tipo is not Transaction.Credit and not Transaction.Debt)
+            return false;
+
+        if (Descricao is null or { Length: 0 or > 10 })
+            return false;
+
+        if (Valor < 0)
+            return false;
+
+        return true;
+    } 
 }

@@ -21,7 +21,7 @@ services:
       - "8080"
     depends_on:
       - postgres
-      - messagequeue
+      - message-broker
       - cache
     deploy:
       resources:
@@ -53,7 +53,7 @@ services:
           cpus: "0.2"
           memory: "50MB"
 
-  messagequeue:
+  message-broker:
     image: nats:2.7.4
     networks:
       - rinha_network

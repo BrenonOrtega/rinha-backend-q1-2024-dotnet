@@ -25,13 +25,6 @@ public sealed partial class Account
     public bool CanExecute(TransactionRequest transaction)
     {
         var transactionType = transaction.Tipo;
-
-        if (transactionType is not Transaction.Credit and not Transaction.Debt)
-            return false;
-
-        if (transaction.Descricao is null or { Length: 0 or > 10 })
-            return false;
-
         if (transactionType is Transaction.Debt)
         {
             return CanExecuteDebt(transaction.Valor);
