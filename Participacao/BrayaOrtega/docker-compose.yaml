@@ -25,8 +25,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.35"
-          memory: "60MB"
+          cpus: "0.3"
+          memory: "65MB"
 
   webapi2:
     <<: *api 
@@ -50,7 +50,7 @@ services:
       resources:
         limits:
           cpus: "0.2"
-          memory: "50MB"
+          memory: "70MB"
 
   message-broker:
     image: nats:2.7.4
@@ -76,7 +76,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.35"
+          cpus: "0.3"
           memory: "75MB"
           
   postgres:
@@ -102,7 +102,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
+          cpus: "0.25"
           memory: "200MB"
 
 networks:
