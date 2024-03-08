@@ -35,18 +35,17 @@ public sealed class CachedRepository : ICachedRepository
 
     private static async Task<Account> GetAccountByIdCore(int id, IDatabase db)
     {
-        var transactions = await db.SortedSetRangeByRankWithScoresAsync(
+        var transactions = await db.SortedSetRangeByRankAsync(
             key: GetBankStatementKey(id),
             order: Order.Descending,
             start: 0, 
             stop: 1);
 
         var lastTransaction = transactions.FirstOrDefault();
-        if (string.IsNullOrEmpty(lastTransaction.Element))
+        if (string.IsNullOrEmpty(lastTransaction))
             return null;
 
-        string stringTransaction = lastTransaction.Element;
-        var t = JsonSerializer.Deserialize<Transaction>(stringTransaction, options);
+        var t = JsonSerializer.Deserialize<Transaction>(lastTransaction, options);
 
         return new Account(t.AccountId, t.Limite, t.Saldo);
     }
