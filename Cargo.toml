@@ -1,0 +1,18 @@
+[package]
+name = "rinha-backend-q1-2024"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+diesel = {version = "2.1.0", features = ["chrono"] }
+chrono = "0.4"
+dotenvy = "0.15"
+actix-web = "4.5.1"
+serde = { version = "1.0.197", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+diesel-async = { version = "0.4.1", features = ["postgres", "bb8"] }
+
+[dev-dependencies]
+actix-rt = "2.9.0"

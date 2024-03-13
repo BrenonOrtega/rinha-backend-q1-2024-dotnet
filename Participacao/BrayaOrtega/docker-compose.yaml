@@ -3,25 +3,15 @@ version: '3.8'
 services:
   webapi1: &api
     hostname: webapi1
-    image: brenonortega/rinha-backend-dotnet-q1-24:1.0.1
+    image: brenonortega/rinha-backend-rust-q1-24:1.0.0
     environment:
-      - BYPASS_CACHE=False
-      - Logging_LogLevel_Default=Error
-      - ASPNETCORE_URLS=http://+:8080
-      - ASPNETCORE_ENVIRONMENT=Production
-      - DOTNET_TieredPGO=1
-      - DOTNET_ReadyToRun=0
-      - DOTNET_TC_QuickJitForLoops=1
-      - NATS_DESTINATION=Transaction
-      - NATS_OWN=Transaction
+      - API_PORT=8080
     networks:
       - rinha_network
     ports:
       - "8080"
     depends_on:
       - postgres
-      - message-broker
-      - cache
     deploy:
       resources:
         limits:
@@ -31,9 +21,6 @@ services:
   webapi2:
     <<: *api 
     hostname: webapi2
-    environment:
-      - NATS_DESTINATION=Transaction
-      - NATS_OWN=Transaction
 
   load-balancer:
     image: nginx:1.24.0-alpine
@@ -52,32 +39,6 @@ services:
           cpus: "0.2"
           memory: "70MB"
 
-  message-broker:
-    image: nats:2.7.4
-    networks:
-      - rinha_network
-    ports:
-      - "4222:4222"
-    command: -js
-    deploy:
-      resources:
-        limits:
-          cpus: "0.15"
-          memory: "40MB"
-
-  cache:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
-    networks:
-      - rinha_network
-    environment:
-      - REDIS_PASSWORD=redis
-    deploy:
-      resources:
-        limits:
-          cpus: "0.3"
-          memory: "75MB"
           
   postgres:
     image: postgres
